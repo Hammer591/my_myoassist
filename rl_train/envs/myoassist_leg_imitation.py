@@ -358,19 +358,24 @@ class MyoAssistLegImitation(MyoAssistLegBase):
         )
         return corrected
 
-    def reset(self, **kwargs):
-        rng = np.random.default_rng()  # TODO: refactoring random to use seed
+    def reset(self, seed=None, **kwargs):
+        if seed is not None:
+            self.seed(seed)
 
         if self._flag_random_ref_index:
-            self._imitation_index = rng.integers(0, int(self._reference_data_length * 0.8))
+            self._imitation_index = self.np_random.integers(0, int(self._reference_data_length * 0.8))
         else:
             self._imitation_index = 0
-        # generate random targets
-        # new_qpos = self.generate_qpos()# TODO: should set qvel too.
-        # self.sim.data.qpos = new_qpos
+        # Reference data only covers some joints. Start the others from the model's
+        # initial state, rather than inheriting the previous rollout (or setup's
+        # zero-action settling steps). Otherwise even a fixed phase depends on history.
+        self.sim.data.qpos[:] = self.init_qpos.copy()
+        self.sim.data.qvel[:] = self.init_qvel.copy()
         self._follow_reference_motion(False)
 
-        obs = super().reset(reset_qpos=self.sim.data.qpos, reset_qvel=self.sim.data.qvel, **kwargs)
+        obs = super().reset(
+            reset_qpos=self.sim.data.qpos.copy(), reset_qvel=self.sim.data.qvel.copy(), seed=seed, **kwargs
+        )
         return obs
 
     # override

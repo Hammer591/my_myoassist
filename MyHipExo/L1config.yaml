@@ -1,0 +1,31 @@
+# Hippo-style rigid coupling. Bone coordinates: x forward, y up, z right.
+# Motor shafts are coaxial with hip flexion; housings remain lateral to the hips.
+# L1bound.xml locks the two passive hinges at zero so cuffs are rigid on femurs.
+device:
+  name: PhotoHipExo_L1
+  model_xml: L1bound.xml
+  compatible_msk: [myolegs22, myolegs26]
+attachments:
+  - device_body: waist
+    parent_body: pelvis
+    pos: [-0.0707, -0.0661, 0]
+  - device_body: thigh_r
+    parent_body: femur_r
+    pos: [0, 0, 0.103328658284019]
+  - device_body: thigh_l
+    parent_body: femur_l
+    pos: [0, 0, -0.103328658284019]
+# User-selected training limit: +/-20 N*m per motor; pending hardware calibration.
+actuators:
+  - name: Exo_R
+    joint: hip_flexion_r
+    gaintype: fixed
+    gainprm: [20, 0, 0]
+    ctrlrange: [-1, 1]
+    ctrllimited: true
+  - name: Exo_L
+    joint: hip_flexion_l
+    gaintype: fixed
+    gainprm: [20, 0, 0]
+    ctrlrange: [-1, 1]
+    ctrllimited: true

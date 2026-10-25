@@ -36,6 +36,11 @@ def _parse_args():
     p.add_argument("--no-show", action="store_true", help="Skip the pop-out composite window.")
     p.add_argument("--regen", action="store_true", help="Regenerate evaluated gait data even if it already exists.")
     p.add_argument(
+        "--fixed-start",
+        action="store_true",
+        help="Start at reference phase 0 instead of a random phase; regenerate cached gait data.",
+    )
+    p.add_argument(
         "--varying",
         action="store_true",
         help="Override evaluate_param_list with a single SINUSOIDAL "
@@ -82,6 +87,10 @@ def main():
         config_dict = json.load(f)
     config = DictionableDataclass.create(ImitationTrainSessionConfig, config_dict)
 
+    if args.fixed_start:
+        config.env_params.flag_random_ref_index = False
+        print("  --fixed-start: reference phase 0")
+
     if args.varying:
         base = dict(config.evaluate_param_list[0]) if config.evaluate_param_list else {}
         base.update(
@@ -127,7 +136,7 @@ def main():
 
         gait_data_name = "gait_evaluated_data.json"
         gait_data_path = os.path.join(analyze_result_dir, gait_data_name)
-        is_regen = args.regen or not os.path.exists(gait_data_path)
+        is_regen = args.regen or args.fixed_start or not os.path.exists(gait_data_path)
 
         with _silence_stdout():
             gait_evaluator = ImitationGaitEvaluator(log_handler, config)
@@ -199,6 +208,7 @@ def main():
             "Eval timesteps": str(evaluate_param["num_timesteps"]),
             "Velocity mode": evaluate_param["velocity_mode"],
             "Target velocity": f"{evaluate_param['min_target_velocity']:.2f}–{evaluate_param['max_target_velocity']:.2f} m/s",
+            "Start phase": "random" if config.env_params.flag_random_ref_index else "0 (fixed)",
         }
 
         # Varying-speed rollout -> speed-aware composite (per-stride teal kinematics

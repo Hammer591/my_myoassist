@@ -65,8 +65,11 @@ if __name__ == "__main__":
             "Topic :: Scientific/Engineering :: Artificial Intelligence :: Simulation",
             "Operating System :: OS Independent",
         ],
-        package_data={"": rl_train_files + ctrl_optim_files},
-        packages=find_packages(include=("myoassist*", "rl_train*", "ctrl_optim*")),
+        package_data={
+            "": rl_train_files + ctrl_optim_files,
+            "MyHipExo": ["*.xml", "*.yaml", "*.json", "mesh/*.stl"],
+        },
+        packages=find_packages(include=("myoassist*", "rl_train*", "ctrl_optim*", "MyHipExo")),
         python_requires=">=3.11",
         install_requires=fetch_requirements(),
     )

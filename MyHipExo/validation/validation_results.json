@@ -1,0 +1,9 @@
+{
+  "binding_tests": {
+    "myolegs22": "passed",
+    "myolegs26": "passed"
+  },
+  "exported_training_model_torque_test": "passed (-20, 0, +20 Nm both sides)",
+  "torque_limit_Nm_per_motor": 20,
+  "configuration": "rl_train/train/train_configs/imitation_22_PhotoHipExo_L1_trial_20Nm.json"
+}

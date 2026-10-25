@@ -138,3 +138,7 @@ MUJOCO_LOG.TXT
 # uv creates this when tooling runs via `uv run`; the project pins deps in
 # requirements.txt, so the lock is an artifact rather than a source of truth.
 uv.lock
+
+# Original import archive and machine-specific composed exports.
+/PhotoHipExo_模型资产.zip
+/MyHipExo/validation/training_model_20Nm.xml

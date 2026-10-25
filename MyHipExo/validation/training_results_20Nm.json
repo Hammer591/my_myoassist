@@ -1,0 +1,48 @@
+{
+  "initial": {
+    "checkpoint": "rl_train/results/train_session_20261025-210456/trained_models/model_512.zip",
+    "episodes": 20,
+    "deterministic": true,
+    "mean_episode_steps": 1.2,
+    "max_episode_steps": 2,
+    "mean_episode_reward": 0.4331862376158558,
+    "trajectory_limit_joint_counts": {
+      "knee_angle_l": 3,
+      "ankle_angle_r": 8,
+      "ankle_angle_l": 11,
+      "knee_angle_r": 6,
+      "hip_flexion_l": 7,
+      "hip_flexion_r": 2
+    },
+    "max_abs_exo_torque_Nm": 9.262946844100952,
+    "observations_and_rewards_finite": true
+  },
+  "trained": {
+    "checkpoint": "rl_train/results/train_session_20261025-210456/trained_models/model_65536.zip",
+    "episodes": 20,
+    "deterministic": true,
+    "mean_episode_steps": 2.25,
+    "max_episode_steps": 4,
+    "mean_episode_reward": 0.9811842618068825,
+    "trajectory_limit_joint_counts": {
+      "ankle_angle_r": 4,
+      "ankle_angle_l": 5,
+      "knee_angle_l": 4,
+      "hip_flexion_l": 3,
+      "hip_flexion_r": 6,
+      "knee_angle_r": 6,
+      "pelvis_tilt": 1
+    },
+    "max_abs_exo_torque_Nm": 17.251888513565063,
+    "observations_and_rewards_finite": true
+  },
+  "training": {
+    "timesteps": 65536,
+    "rollouts": 128,
+    "first_rollout_mean_steps": 1.1774193548387097,
+    "last_rollout_mean_steps": 1.4558404558404558,
+    "first_rollout_mean_reward": 0.38410185136690667,
+    "last_rollout_mean_reward": 0.5462658111101542,
+    "session_dir": "rl_train/results/train_session_20261025-210456"
+  }
+}

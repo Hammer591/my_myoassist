@@ -1,0 +1,225 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mujoco model="PhotoHipExo_L1">
+  <compiler angle="radian" />
+  <option gravity="0 -9.81 0" timestep=".002" />
+  <asset>
+    <mesh name="battery" file="mesh/battery.stl" />
+    <mesh name="battery_cover" file="mesh/battery_cover.stl" />
+    <mesh name="housing_lower_panel" file="mesh/housing_lower_panel.stl" />
+    <mesh name="waist_rail_l" file="mesh/waist_rail_l.stl" />
+    <mesh name="housing_ear_l" file="mesh/housing_ear_l.stl" />
+    <mesh name="housing_clamp_l" file="mesh/housing_clamp_l.stl" />
+    <mesh name="housing_pivot_l" file="mesh/housing_pivot_l.stl" />
+    <mesh name="housing_pivot_bolt_l" file="mesh/housing_pivot_bolt_l.stl" />
+    <mesh name="motor_socket_l" file="mesh/motor_socket_l.stl" />
+    <mesh name="socket_inset_l" file="mesh/socket_inset_l.stl" />
+    <mesh name="upper_gusset_l" file="mesh/upper_gusset_l.stl" />
+    <mesh name="gusset_inset_l" file="mesh/gusset_inset_l.stl" />
+    <mesh name="mount_bolt_l0" file="mesh/mount_bolt_l0.stl" />
+    <mesh name="mount_bolt_l1" file="mesh/mount_bolt_l1.stl" />
+    <mesh name="mount_bolt_l2" file="mesh/mount_bolt_l2.stl" />
+    <mesh name="motor_l" file="mesh/motor_l.stl" />
+    <mesh name="motor_cap_l" file="mesh/motor_cap_l.stl" />
+    <mesh name="motor_bolt_l0" file="mesh/motor_bolt_l0.stl" />
+    <mesh name="motor_bolt_l1" file="mesh/motor_bolt_l1.stl" />
+    <mesh name="motor_bolt_l2" file="mesh/motor_bolt_l2.stl" />
+    <mesh name="motor_bolt_l3" file="mesh/motor_bolt_l3.stl" />
+    <mesh name="motor_bolt_l4" file="mesh/motor_bolt_l4.stl" />
+    <mesh name="motor_bolt_l5" file="mesh/motor_bolt_l5.stl" />
+    <mesh name="motor_bolt_l6" file="mesh/motor_bolt_l6.stl" />
+    <mesh name="motor_bolt_l7" file="mesh/motor_bolt_l7.stl" />
+    <mesh name="motor_bolt_l8" file="mesh/motor_bolt_l8.stl" />
+    <mesh name="motor_bolt_l9" file="mesh/motor_bolt_l9.stl" />
+    <mesh name="waist_rail_r" file="mesh/waist_rail_r.stl" />
+    <mesh name="housing_ear_r" file="mesh/housing_ear_r.stl" />
+    <mesh name="housing_clamp_r" file="mesh/housing_clamp_r.stl" />
+    <mesh name="housing_pivot_r" file="mesh/housing_pivot_r.stl" />
+    <mesh name="housing_pivot_bolt_r" file="mesh/housing_pivot_bolt_r.stl" />
+    <mesh name="motor_socket_r" file="mesh/motor_socket_r.stl" />
+    <mesh name="socket_inset_r" file="mesh/socket_inset_r.stl" />
+    <mesh name="upper_gusset_r" file="mesh/upper_gusset_r.stl" />
+    <mesh name="gusset_inset_r" file="mesh/gusset_inset_r.stl" />
+    <mesh name="mount_bolt_r0" file="mesh/mount_bolt_r0.stl" />
+    <mesh name="mount_bolt_r1" file="mesh/mount_bolt_r1.stl" />
+    <mesh name="mount_bolt_r2" file="mesh/mount_bolt_r2.stl" />
+    <mesh name="motor_r" file="mesh/motor_r.stl" />
+    <mesh name="motor_cap_r" file="mesh/motor_cap_r.stl" />
+    <mesh name="motor_bolt_r0" file="mesh/motor_bolt_r0.stl" />
+    <mesh name="motor_bolt_r1" file="mesh/motor_bolt_r1.stl" />
+    <mesh name="motor_bolt_r2" file="mesh/motor_bolt_r2.stl" />
+    <mesh name="motor_bolt_r3" file="mesh/motor_bolt_r3.stl" />
+    <mesh name="motor_bolt_r4" file="mesh/motor_bolt_r4.stl" />
+    <mesh name="motor_bolt_r5" file="mesh/motor_bolt_r5.stl" />
+    <mesh name="motor_bolt_r6" file="mesh/motor_bolt_r6.stl" />
+    <mesh name="motor_bolt_r7" file="mesh/motor_bolt_r7.stl" />
+    <mesh name="motor_bolt_r8" file="mesh/motor_bolt_r8.stl" />
+    <mesh name="motor_bolt_r9" file="mesh/motor_bolt_r9.stl" />
+    <mesh name="hinge_bridge_l" file="mesh/hinge_bridge_l.stl" />
+    <mesh name="hinge_ear_l0" file="mesh/hinge_ear_l0.stl" />
+    <mesh name="hinge_cheek_l0" file="mesh/hinge_cheek_l0.stl" />
+    <mesh name="hinge_ear_l1" file="mesh/hinge_ear_l1.stl" />
+    <mesh name="hinge_cheek_l1" file="mesh/hinge_cheek_l1.stl" />
+    <mesh name="hinge_pin_l" file="mesh/hinge_pin_l.stl" />
+    <mesh name="hinge_pin_head_l0" file="mesh/hinge_pin_head_l0.stl" />
+    <mesh name="hinge_pin_head_l1" file="mesh/hinge_pin_head_l1.stl" />
+    <mesh name="hinge_knuckle_l" file="mesh/hinge_knuckle_l.stl" />
+    <mesh name="hinge_tongue_l" file="mesh/hinge_tongue_l.stl" />
+    <mesh name="hinge_tongue_bolt_l0" file="mesh/hinge_tongue_bolt_l0.stl" />
+    <mesh name="hinge_tongue_bolt_l1" file="mesh/hinge_tongue_bolt_l1.stl" />
+    <mesh name="curved_link_l" file="mesh/curved_link_l.stl" />
+    <mesh name="link_rib_l0" file="mesh/link_rib_l0.stl" />
+    <mesh name="link_rib_l1" file="mesh/link_rib_l1.stl" />
+    <mesh name="distal_plate_l" file="mesh/distal_plate_l.stl" />
+    <mesh name="distal_cover_l" file="mesh/distal_cover_l.stl" />
+    <mesh name="strap_slot_l-0.043" file="mesh/strap_slot_l-0.043.stl" />
+    <mesh name="strap_slot_l0.043" file="mesh/strap_slot_l0.043.stl" />
+    <mesh name="cuff_bolt_l-0.016-0.024" file="mesh/cuff_bolt_l-0.016-0.024.stl" />
+    <mesh name="cuff_bolt_l0.016-0.024" file="mesh/cuff_bolt_l0.016-0.024.stl" />
+    <mesh name="cuff_bolt_l-0.0160.024" file="mesh/cuff_bolt_l-0.0160.024.stl" />
+    <mesh name="cuff_bolt_l0.0160.024" file="mesh/cuff_bolt_l0.0160.024.stl" />
+    <mesh name="hinge_bridge_r" file="mesh/hinge_bridge_r.stl" />
+    <mesh name="hinge_ear_r0" file="mesh/hinge_ear_r0.stl" />
+    <mesh name="hinge_cheek_r0" file="mesh/hinge_cheek_r0.stl" />
+    <mesh name="hinge_ear_r1" file="mesh/hinge_ear_r1.stl" />
+    <mesh name="hinge_cheek_r1" file="mesh/hinge_cheek_r1.stl" />
+    <mesh name="hinge_pin_r" file="mesh/hinge_pin_r.stl" />
+    <mesh name="hinge_pin_head_r0" file="mesh/hinge_pin_head_r0.stl" />
+    <mesh name="hinge_pin_head_r1" file="mesh/hinge_pin_head_r1.stl" />
+    <mesh name="hinge_knuckle_r" file="mesh/hinge_knuckle_r.stl" />
+    <mesh name="hinge_tongue_r" file="mesh/hinge_tongue_r.stl" />
+    <mesh name="hinge_tongue_bolt_r0" file="mesh/hinge_tongue_bolt_r0.stl" />
+    <mesh name="hinge_tongue_bolt_r1" file="mesh/hinge_tongue_bolt_r1.stl" />
+    <mesh name="curved_link_r" file="mesh/curved_link_r.stl" />
+    <mesh name="link_rib_r0" file="mesh/link_rib_r0.stl" />
+    <mesh name="link_rib_r1" file="mesh/link_rib_r1.stl" />
+    <mesh name="distal_plate_r" file="mesh/distal_plate_r.stl" />
+    <mesh name="distal_cover_r" file="mesh/distal_cover_r.stl" />
+    <mesh name="strap_slot_r-0.043" file="mesh/strap_slot_r-0.043.stl" />
+    <mesh name="strap_slot_r0.043" file="mesh/strap_slot_r0.043.stl" />
+    <mesh name="cuff_bolt_r-0.016-0.024" file="mesh/cuff_bolt_r-0.016-0.024.stl" />
+    <mesh name="cuff_bolt_r0.016-0.024" file="mesh/cuff_bolt_r0.016-0.024.stl" />
+    <mesh name="cuff_bolt_r-0.0160.024" file="mesh/cuff_bolt_r-0.0160.024.stl" />
+    <mesh name="cuff_bolt_r0.0160.024" file="mesh/cuff_bolt_r0.0160.024.stl" />
+  </asset>
+  <worldbody>
+    <body name="waist" pos="0 0 0">
+      <inertial pos="-0.111268760568 0.0447182815529 4.02455554417e-06" mass="2.15080147357" fullinertia="0.0384597433326 0.0474973658986 0.0151368154598 0.00399575600795 1.65059937249e-07 -2.62920836676e-07" />
+      <geom name="battery" type="mesh" mesh="battery" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="battery_cover" type="mesh" mesh="battery_cover" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="gusset_inset_l" type="mesh" mesh="gusset_inset_l" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="gusset_inset_r" type="mesh" mesh="gusset_inset_r" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="housing_clamp_l" type="mesh" mesh="housing_clamp_l" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="housing_clamp_r" type="mesh" mesh="housing_clamp_r" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="housing_ear_l" type="mesh" mesh="housing_ear_l" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="housing_ear_r" type="mesh" mesh="housing_ear_r" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="housing_lower_panel" type="mesh" mesh="housing_lower_panel" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="housing_pivot_bolt_l" type="mesh" mesh="housing_pivot_bolt_l" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="housing_pivot_bolt_r" type="mesh" mesh="housing_pivot_bolt_r" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="housing_pivot_l" type="mesh" mesh="housing_pivot_l" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="housing_pivot_r" type="mesh" mesh="housing_pivot_r" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_l0" type="mesh" mesh="motor_bolt_l0" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_l1" type="mesh" mesh="motor_bolt_l1" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_l2" type="mesh" mesh="motor_bolt_l2" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_l3" type="mesh" mesh="motor_bolt_l3" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_l4" type="mesh" mesh="motor_bolt_l4" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_l5" type="mesh" mesh="motor_bolt_l5" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_l6" type="mesh" mesh="motor_bolt_l6" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_l7" type="mesh" mesh="motor_bolt_l7" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_l8" type="mesh" mesh="motor_bolt_l8" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_l9" type="mesh" mesh="motor_bolt_l9" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_r0" type="mesh" mesh="motor_bolt_r0" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_r1" type="mesh" mesh="motor_bolt_r1" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_r2" type="mesh" mesh="motor_bolt_r2" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_r3" type="mesh" mesh="motor_bolt_r3" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_r4" type="mesh" mesh="motor_bolt_r4" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_r5" type="mesh" mesh="motor_bolt_r5" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_r6" type="mesh" mesh="motor_bolt_r6" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_r7" type="mesh" mesh="motor_bolt_r7" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_r8" type="mesh" mesh="motor_bolt_r8" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_bolt_r9" type="mesh" mesh="motor_bolt_r9" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_cap_l" type="mesh" mesh="motor_cap_l" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_cap_r" type="mesh" mesh="motor_cap_r" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_l" type="mesh" mesh="motor_l" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_r" type="mesh" mesh="motor_r" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_socket_l" type="mesh" mesh="motor_socket_l" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="motor_socket_r" type="mesh" mesh="motor_socket_r" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="mount_bolt_l0" type="mesh" mesh="mount_bolt_l0" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="mount_bolt_l1" type="mesh" mesh="mount_bolt_l1" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="mount_bolt_l2" type="mesh" mesh="mount_bolt_l2" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="mount_bolt_r0" type="mesh" mesh="mount_bolt_r0" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="mount_bolt_r1" type="mesh" mesh="mount_bolt_r1" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="mount_bolt_r2" type="mesh" mesh="mount_bolt_r2" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="socket_inset_l" type="mesh" mesh="socket_inset_l" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="socket_inset_r" type="mesh" mesh="socket_inset_r" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="upper_gusset_l" type="mesh" mesh="upper_gusset_l" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="upper_gusset_r" type="mesh" mesh="upper_gusset_r" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="waist_rail_l" type="mesh" mesh="waist_rail_l" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="waist_rail_r" type="mesh" mesh="waist_rail_r" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <site name="waist_mount" size=".003" rgba="1 .5 0 1" />
+    </body>
+    <body name="thigh_r" pos="0 0 0">
+      <inertial pos="6.41837760051e-20 -0.038351101811 -0.00838908128014" mass="0.0395909838891" fullinertia="8.28537134235e-06 1.04559691057e-05 1.05835125742e-05 -7.94093388051e-23 0 -9.07952402586e-07" />
+      <geom name="hinge_bridge_r" type="mesh" mesh="hinge_bridge_r" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="hinge_cheek_r0" type="mesh" mesh="hinge_cheek_r0" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="hinge_cheek_r1" type="mesh" mesh="hinge_cheek_r1" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="hinge_ear_r0" type="mesh" mesh="hinge_ear_r0" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="hinge_ear_r1" type="mesh" mesh="hinge_ear_r1" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="hinge_pin_head_r0" type="mesh" mesh="hinge_pin_head_r0" rgba=".5 .52 .54 1" contype="0" conaffinity="0" group="1" />
+      <geom name="hinge_pin_head_r1" type="mesh" mesh="hinge_pin_head_r1" rgba=".5 .52 .54 1" contype="0" conaffinity="0" group="1" />
+      <geom name="hinge_pin_r" type="mesh" mesh="hinge_pin_r" rgba=".5 .52 .54 1" contype="0" conaffinity="0" group="1" />
+      <site name="thigh_r_mount" size=".003" rgba="1 .5 0 1" />
+      <body name="link_r" pos="0.0 -0.054 -0.012">
+        <inertial pos="0.0636188646483 -0.235751325765 -0.0587358960433" mass="0.160008279324" fullinertia="0.00205164340315 0.000328857243136 0.00195986138852 0.000397198478206 0.000120032128324 -0.000484572790424" />
+        <joint name="passive_abduction_r" type="hinge" axis="-1 0 0" limited="true" range="-1.5707963267948966 1.5707963267948966" damping="0.05" />
+        <geom name="cuff_bolt_r-0.016-0.024" type="mesh" mesh="cuff_bolt_r-0.016-0.024" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 0.012" />
+        <geom name="cuff_bolt_r-0.0160.024" type="mesh" mesh="cuff_bolt_r-0.0160.024" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 0.012" />
+        <geom name="cuff_bolt_r0.016-0.024" type="mesh" mesh="cuff_bolt_r0.016-0.024" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 0.012" />
+        <geom name="cuff_bolt_r0.0160.024" type="mesh" mesh="cuff_bolt_r0.0160.024" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 0.012" />
+        <geom name="curved_link_r" type="mesh" mesh="curved_link_r" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 0.012" />
+        <geom name="distal_cover_r" type="mesh" mesh="distal_cover_r" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 0.012" />
+        <geom name="distal_plate_r" type="mesh" mesh="distal_plate_r" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 0.012" />
+        <geom name="hinge_knuckle_r" type="mesh" mesh="hinge_knuckle_r" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 0.012" />
+        <geom name="hinge_tongue_bolt_r0" type="mesh" mesh="hinge_tongue_bolt_r0" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 0.012" />
+        <geom name="hinge_tongue_bolt_r1" type="mesh" mesh="hinge_tongue_bolt_r1" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 0.012" />
+        <geom name="hinge_tongue_r" type="mesh" mesh="hinge_tongue_r" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 0.012" />
+        <geom name="link_rib_r0" type="mesh" mesh="link_rib_r0" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 0.012" />
+        <geom name="link_rib_r1" type="mesh" mesh="link_rib_r1" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 0.012" />
+        <geom name="strap_slot_r-0.043" type="mesh" mesh="strap_slot_r-0.043" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 0.012" />
+        <geom name="strap_slot_r0.043" type="mesh" mesh="strap_slot_r0.043" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 0.012" />
+        <site name="link_r_mount" size=".003" rgba="1 .5 0 1" />
+      </body>
+    </body>
+    <body name="thigh_l" pos="0 0 0">
+      <inertial pos="-2.78129696022e-19 -0.038351101811 0.00838908128014" mass="0.0395909838891" fullinertia="8.28537134235e-06 1.04559691057e-05 1.05835125742e-05 -1.05879118407e-22 2.97785020519e-23 9.07952402586e-07" />
+      <geom name="hinge_bridge_l" type="mesh" mesh="hinge_bridge_l" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="hinge_cheek_l0" type="mesh" mesh="hinge_cheek_l0" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="hinge_cheek_l1" type="mesh" mesh="hinge_cheek_l1" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="hinge_ear_l0" type="mesh" mesh="hinge_ear_l0" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="hinge_ear_l1" type="mesh" mesh="hinge_ear_l1" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" />
+      <geom name="hinge_pin_head_l0" type="mesh" mesh="hinge_pin_head_l0" rgba=".5 .52 .54 1" contype="0" conaffinity="0" group="1" />
+      <geom name="hinge_pin_head_l1" type="mesh" mesh="hinge_pin_head_l1" rgba=".5 .52 .54 1" contype="0" conaffinity="0" group="1" />
+      <geom name="hinge_pin_l" type="mesh" mesh="hinge_pin_l" rgba=".5 .52 .54 1" contype="0" conaffinity="0" group="1" />
+      <site name="thigh_l_mount" size=".003" rgba="1 .5 0 1" />
+      <body name="link_l" pos="0.0 -0.054 0.012">
+        <inertial pos="0.0636188646483 -0.235751325765 0.0587358960433" mass="0.160008279324" fullinertia="0.00205164340315 0.000328857243136 0.00195986138852 0.000397198478206 -0.000120032128324 0.000484557612145" />
+        <joint name="passive_abduction_l" type="hinge" axis="1 0 0" limited="true" range="-1.5707963267948966 1.5707963267948966" damping="0.05" />
+        <geom name="cuff_bolt_l-0.016-0.024" type="mesh" mesh="cuff_bolt_l-0.016-0.024" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 -0.012" />
+        <geom name="cuff_bolt_l-0.0160.024" type="mesh" mesh="cuff_bolt_l-0.0160.024" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 -0.012" />
+        <geom name="cuff_bolt_l0.016-0.024" type="mesh" mesh="cuff_bolt_l0.016-0.024" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 -0.012" />
+        <geom name="cuff_bolt_l0.0160.024" type="mesh" mesh="cuff_bolt_l0.0160.024" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 -0.012" />
+        <geom name="curved_link_l" type="mesh" mesh="curved_link_l" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 -0.012" />
+        <geom name="distal_cover_l" type="mesh" mesh="distal_cover_l" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 -0.012" />
+        <geom name="distal_plate_l" type="mesh" mesh="distal_plate_l" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 -0.012" />
+        <geom name="hinge_knuckle_l" type="mesh" mesh="hinge_knuckle_l" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 -0.012" />
+        <geom name="hinge_tongue_bolt_l0" type="mesh" mesh="hinge_tongue_bolt_l0" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 -0.012" />
+        <geom name="hinge_tongue_bolt_l1" type="mesh" mesh="hinge_tongue_bolt_l1" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 -0.012" />
+        <geom name="hinge_tongue_l" type="mesh" mesh="hinge_tongue_l" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 -0.012" />
+        <geom name="link_rib_l0" type="mesh" mesh="link_rib_l0" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 -0.012" />
+        <geom name="link_rib_l1" type="mesh" mesh="link_rib_l1" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 -0.012" />
+        <geom name="strap_slot_l-0.043" type="mesh" mesh="strap_slot_l-0.043" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 -0.012" />
+        <geom name="strap_slot_l0.043" type="mesh" mesh="strap_slot_l0.043" rgba=".055 .065 .075 1" contype="0" conaffinity="0" group="1" pos="-0.0 0.054 -0.012" />
+        <site name="link_l_mount" size=".003" rgba="1 .5 0 1" />
+      </body>
+    </body>
+  </worldbody>
+</mujoco>

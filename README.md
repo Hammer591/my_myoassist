@@ -1,5 +1,16 @@
 # MyoAssist
 
+This checkout includes the custom **PhotoHipExo_L1** hip exoskeleton, with
+Hippo-style rigid coupling to `myolegs22` / `myolegs26` and a training torque
+limit of **±20 N·m per motor**. See [model setup and training](MyHipExo/TRAINING.md)
+and [validation and short training results](MyHipExo/validation/REPORT.md).
+
+![PhotoHipExo attached to the training human model, front and side](MyHipExo/validation/front_side_20Nm.png)
+
+Install the complete checkout with `uv pip install -e .`; device assets remain in
+`MyHipExo/` and are registered by `myoassist_utils/devices.py`. The original
+MyoAssist project and its Apache 2.0 license are retained below.
+
 **An open-source Python toolkit for simulating and optimizing assistive devices in neuromechanical simulations**
 
 MyoAssist is a package within [**MyoSuite**](https://sites.google.com/view/myosuite), a collection of musculoskeletal environments built on [**MuJoCo**](https://mujoco.org/) for reinforcement learning and control research. It is developed and maintained by the [**NeuMove Lab**](https://neumove.org/) at Northeastern University. We aim to bridge neuroscience, biomechanics, robotics, and machine learning to advance the design of assistive devices and deepen our understanding of human movement.

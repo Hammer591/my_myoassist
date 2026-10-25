@@ -1,0 +1,15 @@
+{
+  "source_config": "rl_train/train/train_configs/imitation_22_PhotoHipExo_L1_trial_20Nm.json",
+  "pose": "neutral standing keyframe of the actual training environment model",
+  "torque_limit_Nm_per_side": 20,
+  "observations": [
+    44
+  ],
+  "actions": [
+    24
+  ],
+  "view_azimuths_deg": {
+    "front": 0,
+    "side": 90
+  }
+}

@@ -1,0 +1,68 @@
+<div id="hip-exo-viewer">
+  <div class="viz-row"><strong>髋关节外骨骼 · 三维查看</strong><span class="text-small text-muted">V12 · 被动横摆 ±90°</span></div>
+  <div class="viz-controls" style="margin-top:12px">
+    <label class="form-label">视角 <select class="form-select" id="exo-view"><option value="iso">立体视角</option><option value="hinge">被动铰链近看</option><option value="connection">连接结构近看</option><option value="front">正面</option><option value="back">背面</option><option value="left">左侧</option><option value="right">右侧</option><option value="top">俯视</option><option value="bottom">仰视</option></select></label>
+    <button class="btn" id="exo-fit" type="button">完整显示</button>
+    <label class="form-check"><input class="form-check-input" type="checkbox" id="exo-wire"><span class="form-check-label">线框</span></label>
+  </div>
+  <div id="exo-stage"><span id="exo-loading" role="status">正在加载模型…</span></div>
+  <div class="text-small text-muted">拖动旋转 · 滚轮缩放 · 右键拖动平移 · 触屏双指缩放</div>
+  <div class="viz-controls" style="margin-top:12px">
+    <label class="form-check"><input class="form-check-input" data-group="waist" type="checkbox" checked><span class="form-check-label">腰架与电机</span></label>
+    <label class="form-check"><input class="form-check-input" data-group="thigh_l" type="checkbox" checked><span class="form-check-label">左连杆</span></label>
+    <label class="form-check"><input class="form-check-input" data-group="thigh_r" type="checkbox" checked><span class="form-check-label">右连杆</span></label>
+  </div>
+  <div class="viz-controls" style="margin-top:12px">
+    <label class="form-label">左髋 <output id="exo-left-value">0°</output><input class="form-range" id="exo-left" aria-label="左髋角度" type="range" min="-28" max="90" value="0"></label>
+    <label class="form-label">右髋 <output id="exo-right-value">0°</output><input class="form-range" id="exo-right" aria-label="右髋角度" type="range" min="-28" max="90" value="0"></label>
+  </div>
+  <div class="viz-controls">
+    <label class="form-label">左被动横摆 <output id="exo-passive-left-value">0°</output><input class="form-range" id="exo-passive-left" aria-label="左被动横摆角度" type="range" min="-90" max="90" value="0"></label>
+    <label class="form-label">右被动横摆 <output id="exo-passive-right-value">0°</output><input class="form-range" id="exo-passive-right" aria-label="右被动横摆角度" type="range" min="-90" max="90" value="0"></label>
+  </div>
+  <div class="text-small text-muted" id="exo-status" aria-live="polite">横摆正值向外、负值向内；关节限位 −90° 至 +90°。</div>
+</div>
+<style>
+#hip-exo-viewer{width:100%;color:var(--foreground)}
+#hip-exo-viewer #exo-stage{width:100%;height:460px;position:relative;touch-action:none;margin:8px 0}
+#hip-exo-viewer #exo-stage canvas{display:block;width:100%;height:100%}
+#hip-exo-viewer #exo-loading{position:absolute;top:45%;left:15%;right:15%;text-align:center}
+@media(max-width:480px){#hip-exo-viewer #exo-stage{height:370px}}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(()=>{
+const root=document.getElementById('hip-exo-viewer'),stage=root.querySelector('#exo-stage'),loading=root.querySelector('#exo-loading');
+try{
+const payload=__MODEL_DATA__;
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(38,1,.005,30);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputEncoding=THREE.sRGBEncoding;
+stage.appendChild(renderer.domElement);renderer.domElement.setAttribute('role','img');renderer.domElement.setAttribute('aria-label','可旋转的髋关节外骨骼三维模型，包含腰架、电池盒、双侧电机及大腿连杆');
+const controls=new THREE.OrbitControls(camera,renderer.domElement);controls.target.set(0,-.15,0);controls.minDistance=.25;controls.maxDistance=3;controls.enableDamping=false;
+scene.add(new THREE.HemisphereLight(0xffffff,0x6a7380,1.3));
+for(const [pos,power] of [[[1,2,3],1.25],[[-2,1,-1],.9],[[0,-2,1],.4]]){const light=new THREE.DirectionalLight(0xffffff,power);light.position.set(...pos);scene.add(light);}
+const groups={},materials=[];
+for(const group of payload){const node=new THREE.Group();groups[group.name]=node;node.position.fromArray(group.pos);(group.parent?groups[group.parent]:scene).add(node);
+ for(const part of group.parts){const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(part.vertices,3));geo.setIndex(part.faces);geo.computeVertexNormals();
+ const mat=new THREE.MeshStandardMaterial({color:new THREE.Color().setRGB(...part.color),metalness:.12,roughness:.65,flatShading:true,side:THREE.DoubleSide});materials.push(mat);const mesh=new THREE.Mesh(geo,mat);mesh.name=part.name;node.add(mesh);}}
+const views={iso:[.8,.35,.85],front:[1.1,0,0],back:[-1.1,0,0],left:[0,0,-1.1],right:[0,0,1.1],top:[0,1.1,.0001],bottom:[0,-1.1,.0001]};
+function draw(){renderer.render(scene,camera);}
+function view(key){const detail=key==='connection',hinge=key==='hinge';const v=hinge?[.17,.03,.22]:detail?[.13,.09,.37]:(views[key]||views.iso);controls.target.set(...(hinge?groups.link_r.getWorldPosition(new THREE.Vector3()).toArray():detail?[-.10,.080,.165]:[0,-.15,0]));camera.up.set(0,1,0);camera.position.copy(controls.target).add(new THREE.Vector3(...v));controls.update();draw();}
+function save(){if(window.openai?.setWidgetState)window.openai.setWidgetState({modelContent:{leftHipDeg:+root.querySelector('#exo-left').value,rightHipDeg:+root.querySelector('#exo-right').value,leftPassiveDeg:+root.querySelector('#exo-passive-left').value,rightPassiveDeg:+root.querySelector('#exo-passive-right').value},privateContent:{camera:camera.position.toArray(),target:controls.target.toArray(),wire:root.querySelector('#exo-wire').checked,hidden:Object.keys(groups).filter(k=>!groups[k].visible)}}).catch(()=>{});}
+function angle(side,val){const input=root.querySelector('#exo-'+side);input.value=val;groups[side==='left'?'thigh_l':'thigh_r'].rotation.z=Number(input.value)*Math.PI/180;root.querySelector('#exo-'+side+'-value').value=input.value+'°';draw();}
+function passive(side,val){const input=root.querySelector('#exo-passive-'+side);input.value=val;groups[side==='left'?'link_l':'link_r'].rotation.x=(side==='left'?1:-1)*Number(input.value)*Math.PI/180;root.querySelector('#exo-passive-'+side+'-value').value=input.value+'°';draw();}
+function restore(state){if(!state)return;const m=state.modelContent||{},p=state.privateContent||{};angle('left',m.leftHipDeg||0);angle('right',m.rightHipDeg||0);passive('left',m.leftPassiveDeg||0);passive('right',m.rightPassiveDeg||0);if(p.camera?.length===3)camera.position.fromArray(p.camera);if(p.target?.length===3)controls.target.fromArray(p.target);root.querySelector('#exo-wire').checked=!!p.wire;materials.forEach(m=>m.wireframe=!!p.wire);root.querySelectorAll('[data-group]').forEach(e=>{e.checked=!(p.hidden||[]).includes(e.dataset.group);groups[e.dataset.group].visible=e.checked;});controls.update();draw();}
+controls.addEventListener('change',draw);controls.addEventListener('end',save);
+root.querySelector('#exo-view').onchange=e=>{view(e.target.value);save();};
+root.querySelector('#exo-fit').onclick=()=>{controls.target.set(0,-.15,0);root.querySelector('#exo-view').value='iso';view('iso');save();};
+root.querySelector('#exo-wire').onchange=e=>{materials.forEach(m=>m.wireframe=e.target.checked);draw();save();};
+root.querySelectorAll('[data-group]').forEach(e=>e.onchange=()=>{groups[e.dataset.group].visible=e.checked;draw();save();});
+for(const side of ['left','right']){const input=root.querySelector('#exo-'+side);input.oninput=()=>angle(side,input.value);input.onchange=save;}
+for(const side of ['left','right']){const input=root.querySelector('#exo-passive-'+side);input.oninput=()=>passive(side,input.value);input.onchange=save;}
+new ResizeObserver(()=>{const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();draw();}).observe(stage);
+view('iso');restore(window.openai?.widgetState);window.addEventListener('openai:set_globals',e=>restore(e.detail?.globals?.widgetState));loading.remove();
+window.__exoViewer={scene,camera,groups,renderer,controls};
+}catch(e){loading.textContent='模型未能加载：'+e.message;loading.setAttribute('role','alert');}
+})();
+</script>

@@ -5,8 +5,8 @@ The single front-door schema that both the CO (``ctrl_optim``) and RL
 file or a dict) and hand it to either pipeline, which resolves it to a loadable
 MJCF via :func:`myoassist_utils.compose.compose_env_model`.
 
-Fields are raw assist_sim registry keys -- run ``python -m assist_sim list`` to
-see the valid set:
+Fields accept assist_sim registry keys and MyoAssist project devices. Use
+``myoassist_utils.devices.available_combinations()`` to see the complete set.
 
 ``msk``
     Human MSK key, e.g. ``"myolegs22"`` (2D lineage) or ``"myolegs26"`` (3D).
@@ -95,16 +95,16 @@ class EnvSpec:
 
     # -- validation -----------------------------------------------------------
     def validate(self) -> "EnvSpec":
-        """Validate ``msk``/``device`` against the assist_sim registry and the
+        """Validate ``msk``/``device`` against the combined project registry and the
         ``terrain`` against the terrains loader.
 
         Returns ``self`` so calls can chain (``EnvSpec(...).validate().compose()``).
         Raises ``ValueError`` listing the valid options when a key is unknown or
         the msk/device pair is incompatible.
         """
-        from assist_sim.registry import get_available_combinations
+        from myoassist_utils.devices import available_combinations
 
-        combos = get_available_combinations()
+        combos = available_combinations()
         if self.msk not in combos:
             available = sorted(combos) or "(none -- is myo_sim installed?)"
             raise ValueError(f"Unknown or unavailable MSK {self.msk!r}. Available MSK keys: {available}.")

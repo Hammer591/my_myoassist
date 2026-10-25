@@ -1,0 +1,27 @@
+{
+  "analytic_box_integration_pass": true,
+  "models": {
+    "L1model.xml": {
+      "compiled_total_mass_kg": 2.5499999999961998,
+      "minimum_mass_matrix_eigenvalue": 0.011496707013431735,
+      "gravity": [
+        0.0,
+        -9.81,
+        0.0
+      ],
+      "inertial_tensor_roundtrip_pass": true,
+      "finite_after_simulation": null
+    },
+    "preview.xml": {
+      "compiled_total_mass_kg": 2.5499999999961998,
+      "minimum_mass_matrix_eigenvalue": 0.011387559508144188,
+      "gravity": [
+        0.0,
+        -9.81,
+        0.0
+      ],
+      "inertial_tensor_roundtrip_pass": true,
+      "finite_after_simulation": true
+    }
+  }
+}

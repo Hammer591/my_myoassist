@@ -33,7 +33,7 @@ from uuid import uuid4
 import mujoco as mj
 import numpy as np
 
-from assist_sim import load_combined
+from myoassist_utils.devices import device_source_token, load_combined
 from myoassist_terrains import build_terrain
 from myoassist_terrains.config import config_from_dict, load_config
 from myoassist_terrains.surface import TerrainSurface
@@ -88,6 +88,7 @@ def _compose_cache_key(msk_key: str, device_key: str, terrain, planar_root: bool
     parts = [
         msk_key,
         device_key,
+        device_source_token(device_key),
         _terrain_fingerprint(terrain),
         f"planar={bool(planar_root)}",
         f"assist_sim@{_package_token(assist_sim)}",
