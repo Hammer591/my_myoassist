@@ -2,6 +2,7 @@ import mujoco
 import numpy as np
 import os
 import json
+from copy import deepcopy
 from rl_train.utils.train_log_handler import TrainLogHandler
 from rl_train.train.train_configs.config import TrainSessionConfigBase
 import matplotlib.pyplot as plt
@@ -30,16 +31,24 @@ class GaitEvaluatorBase:
         self,
         *,
         convex_hull_flag: bool = False,
+        evaluation_mode: str = "strict",
+        render: bool = True,
     ):
-        session_config = self.session_config
+        if evaluation_mode not in {"strict", "relaxed"}:
+            raise ValueError("evaluation_mode must be 'strict' or 'relaxed'")
+        self.evaluation_mode = evaluation_mode
+        session_config = deepcopy(self.session_config)
         session_config.env_params.num_envs = 1
-        session_config.env_params.custom_max_episode_steps = 1000000000  # make infinite episode
-        session_config.env_params.out_of_trajectory_threshold = 1000000
+        if evaluation_mode == "relaxed":
+            session_config.env_params.custom_max_episode_steps = 1000000000
+            session_config.env_params.out_of_trajectory_threshold = 1000000
         from rl_train.envs.environment_handler import EnvironmentHandler
 
         self.free_cam = mujoco.MjvCamera()
         # self.free_cam.lookat = np.array([10,0,0], dtype=np.float32)
         self.env = EnvironmentHandler.create_environment(session_config, is_rendering_on=False, is_evaluate_mode=True)
+        if not render:
+            return
 
         _ = self.env.unwrapped.sim.renderer.render_offscreen(camera_id=self.free_cam, width=1920, height=1080)
         self.env.sim.renderer._scene_option.flags[mujoco.mjtVisFlag.mjVIS_CONVEXHULL] = 0 if not convex_hull_flag else 1
@@ -63,6 +72,7 @@ class GaitEvaluatorBase:
         max_target_velocity: float,
         terminate_when_done: bool,
         max_timestep: int = 600,
+        seed: int | None = None,
     ):
         # print(f"load from {self.train_log_handler.get_path2save_model(self.train_log_handler.log_datas[-1].num_timesteps)}")
         # Use get_stable_baselines3_model from EnvironmentHandler to load the model
@@ -87,24 +97,54 @@ class GaitEvaluatorBase:
 
         # gait_data = GaitData(mj_model=env.sim.model, mj_data=env.sim.data)
         gait_data = GaitData()
-
-        obs, info = self.env.reset()
+        seed = self.session_config.env_params.seed if seed is None else seed
+        gait_data.metadata["evaluation"] = {
+            "mode": self.evaluation_mode,
+            "seed": seed,
+            "deterministic": True,
+            "trajectory_threshold": getattr(env_myoassist, "_out_of_trajectory_threshold", None),
+            "max_episode_steps": env_myoassist.CUSTOM_MAX_EPISODE_STEPS,
+            "terminate_when_done": terminate_when_done,
+            "requested_steps": max_timestep,
+        }
+        gait_data.metadata["episode_ids"] = []
+        gait_data.metadata["episodes"] = []
+        episode_id, episode_start, episode_return = 0, 0, 0.0
+        obs, info = self.env.reset(seed=seed)
 
         for time_step in range(max_timestep):
             # time.sleep(env.dt)
             action, _states = model.predict(obs, deterministic=True)
 
             obs, rewards, done, truncated, info = self.env.step(action)
+            episode_return += float(rewards)
             gait_data.add_data(
                 mj_model=self.env.sim.model,
                 mj_data=self.env.sim.data,
                 target_velocity=env_myoassist._target_velocity,
                 printing=True if time_step == 0 else False,
             )
-
+            gait_data.metadata["episode_ids"].append(episode_id)
+            if done or truncated or time_step == max_timestep - 1:
+                gait_data.metadata["episodes"].append(
+                    {
+                        "episode_id": episode_id,
+                        "start": episode_start,
+                        "end_exclusive": time_step + 1,
+                        "length": time_step + 1 - episode_start,
+                        "return": episode_return,
+                        "terminated": bool(done),
+                        "truncated": bool(truncated),
+                        "termination_reasons": info.get("termination_reasons", []),
+                        "trajectory_errors": info.get("trajectory_errors", {}),
+                        "evaluation_budget_reached": not (done or truncated),
+                    }
+                )
             if done or truncated:
-                if terminate_when_done:
+                if terminate_when_done or time_step == max_timestep - 1:
                     break
+                episode_id += 1
+                episode_start, episode_return = time_step + 1, 0.0
                 obs, info = self.env.reset()
         gait_data.print_brief_data()
 
@@ -518,11 +558,6 @@ class ImitationGaitEvaluator(GaitEvaluatorBase):
         self.ref_data_dict = ref_data_dict
         print("===============REFERENCE DATA LOADING DONE================")
 
-    def initialize_env(self):
-        # Only set reference_data if we have valid reference data
-        if self.ref_data_dict is not None:
-            self.session_config.env_params.reference_data = self.ref_data_dict
-        super().initialize_env()
-
-        self.env.close()
-        print("Evaluate done!")
+    def initialize_env(self, **kwargs):
+        # EnvironmentHandler loads the reference from the config's path.
+        super().initialize_env(**kwargs)

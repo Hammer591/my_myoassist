@@ -26,7 +26,7 @@
 .my_venv/bin/python -m rl_train.run_train --config_file_path rl_train/train/train_configs/device_sweep/imitation_22_PhotoHipExo_L1_h128_e32_sidenet_mirror0p1_actpen10.json
 ```
 
-该配置沿用 Hippo 的 22 肌肉人体、双侧外骨骼网络及镜像设置，只替换设备键。动作最后两维依次控制右、左电机。用户指定训练限值：每侧 `[-1, 1]` 输入对应 `[-20, 20]` N·m，实际额定/峰值扭矩仍待提供；这不是已校准的电机性能。修改 YAML 的 `gainprm` 可调整限值。质量和惯量保留 V13 数据及其原有估算假设。
+该配置沿用 Hippo 的 22 肌肉人体、双侧外骨骼网络及镜像设置，只替换设备键。动作最后两维依次控制右、左电机。用户指定训练限值：每侧 `[-1, 1]` 输入对应 `[-20, 20]` N·m。2026-10-27 核对官方手册后，确认产品表列有“峰值输出 20 Nm”，但未说明单侧/双侧口径，也未给出连续额定扭矩、峰值持续时间或扭矩—转速曲线；当前理想执行器不代表连续输出能力已校准。详见 [官方指标核对](OFFICIAL_OUTPUT_SPEC.md)。质量以用户实测为准，保留现有约 2.55 kg 模型和惯量，不按官方含电池整机重量缩放。
 
 短程试训使用以下配置：65,536 步、单环境、每次采样 512 步、batch size 512、10 个优化 epoch。使用单环境是因为当前沙箱不允许多进程通信。其余网络、参考轨迹、奖励和终止阈值沿用原训练配置。
 
@@ -52,3 +52,16 @@ MPLCONFIGDIR=/tmp/myoassist_mpl MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 .
 检查两个人体版本的加载、主舱中立姿态、髋轴同轴、不同髋角下固定器相对股骨不动、整机约 2.55 kg、驱动器顺序及 ±20 N·m 输出。另已运行实际训练环境的 128 步 MirrorPPO（44 维观测、24 维动作）；这只证明训练接入和梯度更新可运行，未验证步态收敛或真实助力效果。
 
 最新 ±20 N·m 试训已完成 65,536 步。相同 20 个起始种子的确定性复测中，平均回合长度由 1.20 提高到 2.25 个控制步，但仍未学会稳定行走。完整指标与检查点位置见 `validation/REPORT.md`。
+
+## 2026-10-27 训练统计与评估修复
+
+已修复目标速度参数错位、奖励分项重复累计及跨日志窗口丢失、多个环境使用相同种子等问题。惩罚、奖励公式、PPO 设置与设备物理参数保持不变；历史训练日志不会自动变成修复后的统计口径。完整修改与测试记录见 [修改日志](../docs/reinforcement-learning/07_training_fixes_20261027.md)。
+
+默认评估使用训练终止阈值，放宽轨迹约束必须显式选择：
+
+```bash
+.my_venv/bin/python -m rl_train.run_policy_eval rl_train/results/train_session_20261026-140410 --evaluation-mode strict --no-show
+.my_venv/bin/python -m rl_train.run_policy_eval rl_train/results/train_session_20261026-140410 --evaluation-mode relaxed --steps 600 --no-show
+```
+
+输出目录带 `_strict` / `_relaxed` 后缀，避免复用旧评估缓存。定期训练评估默认 strict；需要放宽模式时，在 `evaluate_param_list` 对应条目加入 `"evaluation_mode": "relaxed"`。两种模式均保存种子、有效阈值、每回合长度、结束原因及 episode ID，步态分段不会跨 reset。

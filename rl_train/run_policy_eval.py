@@ -36,6 +36,12 @@ def _parse_args():
     p.add_argument("--no-show", action="store_true", help="Skip the pop-out composite window.")
     p.add_argument("--regen", action="store_true", help="Regenerate evaluated gait data even if it already exists.")
     p.add_argument(
+        "--evaluation-mode",
+        choices=("strict", "relaxed"),
+        default="strict",
+        help="strict uses training termination limits; relaxed measures walking with trajectory limits disabled.",
+    )
+    p.add_argument(
         "--fixed-start",
         action="store_true",
         help="Start at reference phase 0 instead of a random phase; regenerate cached gait data.",
@@ -124,7 +130,7 @@ def main():
     print("=" * 60)
 
     for idx, evaluate_param in enumerate(config.evaluate_param_list):
-        analyze_result_dir = os.path.join(log_dir, f"analyze_results_{idx:02d}")
+        analyze_result_dir = os.path.join(log_dir, f"analyze_results_{idx:02d}_{args.evaluation_mode}")
         os.makedirs(analyze_result_dir, exist_ok=True)
         print(f"\n[Rollout {idx + 1}/{len(config.evaluate_param_list)}] -> {analyze_result_dir}")
 
@@ -141,7 +147,7 @@ def main():
         with _silence_stdout():
             gait_evaluator = ImitationGaitEvaluator(log_handler, config)
             gait_evaluator.load_reference_data()
-            gait_evaluator.initialize_env()
+            gait_evaluator.initialize_env(evaluation_mode=args.evaluation_mode)
             if is_regen:
                 gait_data_path = gait_evaluator.evaluate(
                     result_dir=analyze_result_dir,
@@ -175,6 +181,7 @@ def main():
         gait_analyzer = GaitAnalyzer(gait_data, segmented_ref_data, show_plot=False)
         if len(gait_analyzer.get_gait_segment_index(is_right_foot_based=True)) < 1:
             print("  Warning: not enough gait data to plot — skipping composite.")
+            gait_evaluator.env.close()
             continue
 
         if args.legacy_plots:
@@ -205,7 +212,8 @@ def main():
             "Model checkpoint": os.path.basename(log_handler.get_path2save_model(log_handler.log_datas[-1].num_timesteps)),
             "Env ID": config.env_params.env_id,
             "Total timesteps": f"{log_handler.log_datas[-1].num_timesteps:,}",
-            "Eval timesteps": str(evaluate_param["num_timesteps"]),
+            "Eval timesteps": str(gait_data.metadata["data_length"]),
+            "Evaluation mode": args.evaluation_mode,
             "Velocity mode": evaluate_param["velocity_mode"],
             "Target velocity": f"{evaluate_param['min_target_velocity']:.2f}–{evaluate_param['max_target_velocity']:.2f} m/s",
             "Start phase": "random" if config.env_params.flag_random_ref_index else "0 (fixed)",
@@ -234,6 +242,7 @@ def main():
             fs=config.env_params.control_framerate,
             cmap=CMAPS[args.cmap],
         )
+        gait_evaluator.env.close()
 
 
 if __name__ == "__main__":

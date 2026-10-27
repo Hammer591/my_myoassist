@@ -53,6 +53,35 @@ class GaitAnalyzer:
         plt.ioff()  # Turn off interactive mode
 
     def get_gait_segment_index(self, *, is_right_foot_based: bool):
+        """Segment each recorded episode independently; never bridge an environment reset."""
+        episode_ids = self.gait_data.metadata.get("episode_ids")
+        if episode_ids is None:
+            return self._get_continuous_gait_segment_index(is_right_foot_based=is_right_foot_based)
+        if len(episode_ids) != self.gait_data.metadata["data_length"]:
+            raise ValueError("episode_ids must have one entry per recorded control step")
+        boundaries = [0] + [i for i in range(1, len(episode_ids)) if episode_ids[i] != episode_ids[i - 1]]
+        boundaries.append(len(episode_ids))
+
+        def slice_series(node, start, end):
+            if isinstance(node, dict):
+                return {key: slice_series(value, start, end) for key, value in node.items()}
+            return node[start:end]
+
+        segments = []
+        for start, end in zip(boundaries[:-1], boundaries[1:]):
+            if start == end:
+                continue
+            episode = GaitData()
+            episode.series_data = slice_series(self.gait_data.series_data, start, end)
+            episode.metadata = {"data_length": end - start}
+            analyzer = GaitAnalyzer(episode, self.segmented_ref_data, self.show_plot)
+            segments.extend(
+                tuple(start + index for index in segment)
+                for segment in analyzer._get_continuous_gait_segment_index(is_right_foot_based=is_right_foot_based)
+            )
+        return segments
+
+    def _get_continuous_gait_segment_index(self, *, is_right_foot_based: bool):
         """
         Calculate gait segment indices based on foot sensor data.
 

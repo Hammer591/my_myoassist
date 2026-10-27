@@ -38,6 +38,8 @@ class BaseCustomLearningCallback(BaseCallback):
         self.episode_reward_dict_sum = [{} for _ in range(self.training_env.num_envs)]
 
         self.prev_logging_timestep = 0
+        self.target_velocities = []
+        self.termination_counts = {}
 
     # called after all envs step done
     def _on_step(self) -> bool:
@@ -61,7 +63,9 @@ class BaseCustomLearningCallback(BaseCallback):
                 for key, val in info_dict["rwd_dict"].items():
                     if key not in self.current_reward_dict_sum[idx]:
                         self.current_reward_dict_sum[idx][key] = 0
-                    self.current_reward_dict_sum[idx][key] += val
+                    self.current_reward_dict_sum[idx][key] += float(np.asarray(val).item())
+            if isinstance(info_dict, dict) and "target_velocity" in info_dict:
+                self.target_velocities.append(float(info_dict["target_velocity"]))
             if done:
                 self.rewards_sum[idx] += self.current_episode_rewards[idx]
                 self.episode_counts[idx] += 1
@@ -74,6 +78,9 @@ class BaseCustomLearningCallback(BaseCallback):
                     if key not in self.episode_reward_dict_sum[idx]:
                         self.episode_reward_dict_sum[idx][key] = 0
                     self.episode_reward_dict_sum[idx][key] += val
+                self.current_reward_dict_sum[idx] = {}
+                for reason in (info_dict or {}).get("termination_reasons", []):
+                    self.termination_counts[reason] = self.termination_counts.get(reason, 0) + 1
 
         return True
 
@@ -94,21 +101,16 @@ class BaseCustomLearningCallback(BaseCallback):
                 value = self.logger.name_to_value.get(key, default)
                 return value.item() if hasattr(value, "item") else value
 
-            # average_reward_dict_per_episode=[{key:self.episode_reward_dict_sum[idx][key] / self.episode_counts[idx] for key in self.episode_reward_dict_sum[idx].keys()} for idx in range(self.training_env.num_envs)]
-            # Calculate the average reward for each key across all environments
-            # average_reward_dict_per_episode={key:sum(average_reward_dict_per_episode[idx][key] for idx in range(self.training_env.num_envs)) / self.training_env.num_envs for key in average_reward_dict_per_episode[0].keys()}
-            # If there are no keys in self.episode_reward_dict_sum[idx], set all values to 0
-            for idx in range(self.training_env.num_envs):
-                if not self.episode_reward_dict_sum[idx]:
-                    self.episode_reward_dict_sum[idx] = {key: 0 for key in self.episode_reward_dict_sum[0].keys()}
-
-            average_reward_dict_per_episode = {
-                key: (
-                    sum(self.episode_reward_dict_sum[idx][key] for idx in range(self.training_env.num_envs))
-                    / sum(self.episode_counts)
-                )
-                for key in self.episode_reward_dict_sum[0].keys()
-            }
+            completed_episodes = int(np.sum(self.episode_counts))
+            reward_keys = set().union(*(d.keys() for d in self.episode_reward_dict_sum))
+            average_reward_dict_per_episode = (
+                {
+                    key: sum(d.get(key, 0.0) for d in self.episode_reward_dict_sum) / completed_episodes
+                    for key in sorted(reward_keys)
+                }
+                if completed_episodes
+                else {}
+            )
 
             log_data = TrainCheckpointData(
                 approx_kl=get_logger_value("train/approx_kl"),
@@ -133,6 +135,19 @@ class BaseCustomLearningCallback(BaseCallback):
                     np.sum(self.rewards_sum) / np.sum(self.episode_counts) if np.sum(self.episode_counts) != 0 else np.array(0)
                 ).item(),
                 average_reward_dict_per_episode=average_reward_dict_per_episode,
+                completed_episodes=completed_episodes,
+                reward_log_schema_version=2,
+                target_velocity_stats=(
+                    {
+                        "min": min(self.target_velocities),
+                        "mean": float(np.mean(self.target_velocities)),
+                        "max": max(self.target_velocities),
+                        "samples": len(self.target_velocities),
+                    }
+                    if self.target_velocities
+                    else {}
+                ),
+                termination_counts=self.termination_counts.copy(),
                 time=f"{datetime.now().strftime('%Y%m%d-%H%M%S.%f')}",
             )
             if write_log:
@@ -143,7 +158,9 @@ class BaseCustomLearningCallback(BaseCallback):
             self.episode_counts = np.zeros(self.training_env.num_envs)
             self.episode_length_counts = np.zeros(self.training_env.num_envs)
             self.episode_reward_dict_sum = [{} for _ in range(self.training_env.num_envs)]
-            self.current_reward_dict_sum = [{} for _ in range(self.training_env.num_envs)]
+            # Unfinished episodes span logging windows, just like current_episode_rewards.
+            self.target_velocities = []
+            self.termination_counts = {}
 
         if self.log_count % self.evaluate_freq == 0 and self.log_count != 0:
             # Create new pool each time to prevent memory leaks

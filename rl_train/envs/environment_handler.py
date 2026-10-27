@@ -1,5 +1,6 @@
 import numpy as np
 import json
+from functools import partial
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from myosuite.utils import gym
 from rl_train.utils.data_types import DictionableDataclass
@@ -11,6 +12,10 @@ from rl_train.train.train_configs.config import TrainSessionConfigBase
 # for both the policy switch in get_stable_baselines3_model and the guard below, which is
 # only correct as long as the two agree.
 _EXO_ENV_IDS = ("myoAssistLegImitationExo-v0",)
+
+
+def _make_env(env_id, **kwargs):
+    return gym.make(env_id, **kwargs).unwrapped
 
 
 class EnvironmentHandler:
@@ -155,8 +160,15 @@ class EnvironmentHandler:
             else:
                 env = SubprocVecEnv(
                     [
-                        lambda: (gym.make(config.env_params.env_id, **gym_make_args)).unwrapped
-                        for _ in range(config.env_params.num_envs)
+                        partial(
+                            _make_env,
+                            config.env_params.env_id,
+                            **{
+                                **gym_make_args,
+                                "seed": config.env_params.seed + rank,
+                            },
+                        )
+                        for rank in range(config.env_params.num_envs)
                     ]
                 )
         except Exception as e:

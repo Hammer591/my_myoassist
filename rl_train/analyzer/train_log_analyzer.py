@@ -23,8 +23,7 @@ class TrainLogAnalyzer:
             plt.show()
 
     def plot_reward_dict(self, *, result_dir: str, show_plot: bool, mult_weights: bool = False):
-        start_index = 1  # TODO: Don't know why, but, the first average_reward_dict_per_episode data is empty dict
-        modified_log_datas = self._train_log_handler.log_datas[start_index:]
+        modified_log_datas = [d for d in self._train_log_handler.log_datas if d.average_reward_dict_per_episode]
         # Extract time steps and average reward dictionary per episode
         time_steps = [log_data.num_timesteps for log_data in modified_log_datas]
 
@@ -77,10 +76,7 @@ class TrainLogAnalyzer:
                         if isinstance(weight_value, dict):
                             # Sum all values in the dictionary for each timestep
                             reward_weights[key] = [
-                                sum(weight_dict.values())
-                                for weight_dict in (
-                                    log_data.reward_weights.get(key, {}).values() for log_data in modified_log_datas
-                                )
+                                sum(log_data.reward_weights.get(key, {}).values()) for log_data in modified_log_datas
                             ]
                         else:
                             # Directly use the weight if it's not a dictionary
@@ -144,9 +140,10 @@ class TrainLogAnalyzer:
             )
             bottom = [b + d for b, d in zip(bottom, data)]
 
-        ax.set_title("Proportion of Average Reward per Episode")
+        legacy = any(d.reward_log_schema_version < 2 for d in modified_log_datas)
+        ax.set_title("Average Reward Components per Episode" + (" (legacy accounting: unverified)" if legacy else ""))
         ax.set_xlabel("Timesteps")
-        ax.set_ylabel("Proportion of Reward")
+        ax.set_ylabel("Weighted reward contribution" if mult_weights else "Recorded reward component")
         ax.legend(loc="upper left")
 
         fig.tight_layout()

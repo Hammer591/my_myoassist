@@ -300,10 +300,17 @@ class MyoAssistLegImitation(MyoAssistLegBase):
         if is_out_of_index:
             reward = 0
             truncated = True
+            info["termination_reasons"].append("reference_exhausted")
         else:
             q_diff_nparray: np.ndarray = self._get_qpos_diff_nparray()
             is_out_of_trajectory = np.any(np.abs(q_diff_nparray) > self._out_of_trajectory_threshold)
             terminated = terminated or is_out_of_trajectory
+            info["trajectory_errors"] = {
+                key: float(value)
+                for key, value in self._get_qpos_diff().items()
+                if abs(value) > self._out_of_trajectory_threshold
+            }
+            info["termination_reasons"].extend(f"trajectory:{key}" for key in info["trajectory_errors"])
 
         return (next_obs, reward, terminated, truncated, info)
 
@@ -359,8 +366,9 @@ class MyoAssistLegImitation(MyoAssistLegBase):
         return corrected
 
     def reset(self, seed=None, **kwargs):
-        if seed is not None:
-            self.seed(seed)
+        # Pick the new target before scaling the reference velocities. The base reset
+        # must not draw a second target after the pose/velocity copies have been made.
+        self._prepare_reset_target(seed)
 
         if self._flag_random_ref_index:
             self._imitation_index = self.np_random.integers(0, int(self._reference_data_length * 0.8))
@@ -374,7 +382,11 @@ class MyoAssistLegImitation(MyoAssistLegBase):
         self._follow_reference_motion(False)
 
         obs = super().reset(
-            reset_qpos=self.sim.data.qpos.copy(), reset_qvel=self.sim.data.qvel.copy(), seed=seed, **kwargs
+            reset_qpos=self.sim.data.qpos.copy(),
+            reset_qvel=self.sim.data.qvel.copy(),
+            seed=seed,
+            _target_prepared=True,
+            **kwargs,
         )
         return obs
 

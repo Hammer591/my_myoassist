@@ -41,16 +41,20 @@ class TrainAnalyzer:
                 #     print(f"{field.name}: {getattr(config.env_params.reward_keys_and_weights, field.name)}")
 
         for eval_idx, evaluate_param in enumerate(config.evaluate_param_list):
+            evaluation_mode = evaluate_param.get("evaluation_mode", "strict")
+            if evaluation_mode not in {"strict", "relaxed"}:
+                raise ValueError(f"Unknown evaluation mode: {evaluation_mode}")
             log_handler = TrainLogHandler(log_dir)
             log_handler.load_log_data(ImitationTrainCheckpointData)
 
             train_analyzer_report = {
                 "num_timesteps": log_handler.log_datas[-1].num_timesteps,
                 "exceptions": [],
+                "evaluation_mode": evaluation_mode,
             }
 
             analyze_result_dir = os.path.join(
-                log_dir, f"analyze_results_{log_handler.log_datas[-1].num_timesteps}_{eval_idx:02d}"
+                log_dir, f"analyze_results_{log_handler.log_datas[-1].num_timesteps}_{eval_idx:02d}_{evaluation_mode}"
             )
             if not os.path.exists(analyze_result_dir):
                 os.makedirs(analyze_result_dir)
@@ -85,7 +89,7 @@ class TrainAnalyzer:
 
             gait_evaluator = ImitationGaitEvaluator(log_handler, config)
             gait_evaluator.load_reference_data()
-            gait_evaluator.initialize_env()
+            gait_evaluator.initialize_env(evaluation_mode=evaluation_mode)
 
             if is_regen_evaluating_data:
                 gait_data_path = gait_evaluator.evaluate(
@@ -104,6 +108,8 @@ class TrainAnalyzer:
 
             gait_data = GaitData()
             gait_data.read_json_data(gait_data_path)
+            train_analyzer_report["evaluation"] = gait_data.metadata.get("evaluation", {})
+            train_analyzer_report["episodes"] = gait_data.metadata.get("episodes", [])
 
             # Only load reference data and perform analysis for imitation learning environments
             if config.env_params.env_id in ["myoAssistLegImitation-v0", "myoAssistLegImitationExo-v0"]:
@@ -151,6 +157,7 @@ class TrainAnalyzer:
             train_analyzer_report_path = os.path.join(analyze_result_dir, "train_analyzer_report.json")
             with open(train_analyzer_report_path, "w") as f:
                 json.dump(train_analyzer_report, f)
+            gait_evaluator.env.close()
 
     def analyze(self, gait_data, segmented_ref_data, analyze_result_dir, show_plot: bool):
         exception_report_list = []
