@@ -57,11 +57,11 @@ MPLCONFIGDIR=/tmp/myoassist_mpl MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 .
 
 已修复目标速度参数错位、奖励分项重复累计及跨日志窗口丢失、多个环境使用相同种子等问题。惩罚、奖励公式、PPO 设置与设备物理参数保持不变；历史训练日志不会自动变成修复后的统计口径。完整修改与测试记录见 [修改日志](../docs/reinforcement-learning/07_training_fixes_20261027.md)。
 
-默认评估使用训练终止阈值，放宽轨迹约束必须显式选择：
+默认评估采用 relaxed 单回合连续回放，允许偏离参考轨迹；触发高度等结束条件即停止，不再 reset 凑足帧数。strict 用于显式检查训练终止阈值：
 
 ```bash
 .my_venv/bin/python -m rl_train.run_policy_eval rl_train/results/train_session_20261026-140410 --evaluation-mode strict --no-show
 .my_venv/bin/python -m rl_train.run_policy_eval rl_train/results/train_session_20261026-140410 --evaluation-mode relaxed --steps 600 --no-show
 ```
 
-输出目录带 `_strict` / `_relaxed` 后缀，避免复用旧评估缓存。定期训练评估默认 strict；需要放宽模式时，在 `evaluate_param_list` 对应条目加入 `"evaluation_mode": "relaxed"`。两种模式均保存种子、有效阈值、每回合长度、结束原因及 episode ID，步态分段不会跨 reset。
+输出目录带 `_strict` / `_relaxed` 后缀，避免复用旧评估缓存。定期训练评估默认 relaxed；需要严格诊断时，在 `evaluate_param_list` 对应条目加入 `"evaluation_mode": "strict"`。旧的多回合拼接缓存会重新生成。两种模式均保存种子、有效阈值、每回合长度、结束原因及 episode ID，步态分段不会跨 reset。

@@ -38,8 +38,8 @@ def _parse_args():
     p.add_argument(
         "--evaluation-mode",
         choices=("strict", "relaxed"),
-        default="strict",
-        help="strict uses training termination limits; relaxed measures walking with trajectory limits disabled.",
+        default="relaxed",
+        help="relaxed (default) replays one continuous walking attempt; strict diagnoses reference-tracking limits.",
     )
     p.add_argument(
         "--fixed-start",
@@ -142,7 +142,13 @@ def main():
 
         gait_data_name = "gait_evaluated_data.json"
         gait_data_path = os.path.join(analyze_result_dir, gait_data_name)
-        is_regen = args.regen or args.fixed_start or not os.path.exists(gait_data_path)
+        is_regen = (
+            args.regen
+            or args.fixed_start
+            or args.steps is not None
+            or args.varying
+            or not ImitationGaitEvaluator.is_single_episode_cache(gait_data_path, args.evaluation_mode)
+        )
 
         with _silence_stdout():
             gait_evaluator = ImitationGaitEvaluator(log_handler, config)

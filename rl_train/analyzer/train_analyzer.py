@@ -41,7 +41,9 @@ class TrainAnalyzer:
                 #     print(f"{field.name}: {getattr(config.env_params.reward_keys_and_weights, field.name)}")
 
         for eval_idx, evaluate_param in enumerate(config.evaluate_param_list):
-            evaluation_mode = evaluate_param.get("evaluation_mode", "strict")
+            # The main replay shows one continuous attempt. Strict tracking is
+            # an explicit diagnostic, not a reason to reset the default video.
+            evaluation_mode = evaluate_param.get("evaluation_mode", "relaxed")
             if evaluation_mode not in {"strict", "relaxed"}:
                 raise ValueError(f"Unknown evaluation mode: {evaluation_mode}")
             log_handler = TrainLogHandler(log_dir)
@@ -74,7 +76,9 @@ class TrainAnalyzer:
 
             gait_data_name = f"gait_evaluated_data_{eval_idx:02d}.json"
 
-            if not os.path.exists(os.path.join(analyze_result_dir, gait_data_name)):
+            if not ImitationGaitEvaluator.is_single_episode_cache(
+                os.path.join(analyze_result_dir, gait_data_name), evaluation_mode
+            ):
                 is_regen_evaluating_data = True
             elif sys.stdin is not None and sys.stdin.isatty():
                 is_regen_evaluating_data = input(f"Regenerate evaluate data? ({gait_data_name}) (y/n(anything))") == "y"
@@ -100,7 +104,7 @@ class TrainAnalyzer:
                     max_timestep=evaluate_param["num_timesteps"],
                     min_target_velocity=evaluate_param["min_target_velocity"],
                     max_target_velocity=evaluate_param["max_target_velocity"],
-                    terminate_when_done=False,
+                    terminate_when_done=True,
                 )
             else:
                 # it will(should) not happen during the training

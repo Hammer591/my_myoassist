@@ -31,7 +31,7 @@ class GaitEvaluatorBase:
         self,
         *,
         convex_hull_flag: bool = False,
-        evaluation_mode: str = "strict",
+        evaluation_mode: str = "relaxed",
         render: bool = True,
     ):
         if evaluation_mode not in {"strict", "relaxed"}:
@@ -70,7 +70,7 @@ class GaitEvaluatorBase:
         target_velocity_period: float,
         min_target_velocity: float,
         max_target_velocity: float,
-        terminate_when_done: bool,
+        terminate_when_done: bool = True,
         max_timestep: int = 600,
         seed: int | None = None,
     ):
@@ -100,6 +100,7 @@ class GaitEvaluatorBase:
         seed = self.session_config.env_params.seed if seed is None else seed
         gait_data.metadata["evaluation"] = {
             "mode": self.evaluation_mode,
+            "checkpoint": os.path.abspath(trained_model_path + ".zip"),
             "seed": seed,
             "deterministic": True,
             "trajectory_threshold": getattr(env_myoassist, "_out_of_trajectory_threshold", None),
@@ -157,6 +158,19 @@ class GaitEvaluatorBase:
         # print("==============================READ DATA==================================")
 
         return gait_data_path
+
+    @staticmethod
+    def is_single_episode_cache(path: str, evaluation_mode: str) -> bool:
+        """Reject old stitched rollouts when preparing a continuous policy replay."""
+        if not os.path.exists(path):
+            return False
+        with open(path, "r") as file:
+            metadata = json.load(file).get("metadata", {})
+        evaluation = metadata.get("evaluation", {})
+        episodes = metadata.get("episodes", [])
+        return (
+            evaluation.get("mode") == evaluation_mode and evaluation.get("terminate_when_done") is True and len(episodes) == 1
+        )
 
     def replay(
         self,
