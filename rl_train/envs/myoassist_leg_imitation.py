@@ -57,44 +57,13 @@ class ImitationCustomLearningCallback(BaseCustomLearningCallback):
     def _on_rollout_start(self) -> None:
         super()._on_rollout_start()
 
-    def _on_rollout_end(self, write_log: bool = True) -> "ImitationTrainCheckpointData":
-        log_data_base = super()._on_rollout_end(write_log=False)
-        if log_data_base is None:
-            return
-        log_data = ImitationTrainCheckpointData(
+    def _prepare_log_data(self, log_data_base) -> ImitationTrainCheckpointData:
+        # Construct the complete record before the base callback publishes it and evaluates.
+        return ImitationTrainCheckpointData(
             **log_data_base.__dict__,
             reward_weights=DictionableDataclass.to_dict(self._reward_weights),
             reward_accumulate=self.reward_accumulate.copy(),
         )
-        if write_log:
-            self.train_log_handler.add_log_data(log_data)
-            self.train_log_handler.write_json_file()
-
-        self.rewards_sum = np.zeros(self.training_env.num_envs)
-        self.episode_counts = np.zeros(self.training_env.num_envs)
-        self.episode_length_counts = np.zeros(self.training_env.num_envs)
-
-        ## ARA (Disabled)
-
-        # print(f"DEBUG:: {self.reward_accumulate=}")
-        # joint_rewards = {}
-        # for key in self.reward_accumulate.keys():
-        #     # print(f"DEBUG:: {key=} {self.reward_accumulate[key]=}")
-        #     if MyoLeg18Imitation.Q_POS_DIFF_REWARD_KEY_PREFIX in key:
-        #         joint_rewards[key] = self.reward_accumulate[key]
-        #     self.reward_accumulate[key] = 0
-        # reward_mean = 0
-        # for key in joint_rewards.keys():
-        #     reward_mean += joint_rewards[key]
-        # reward_mean /= len(joint_rewards)
-        # joint_reward_deviations = {key: (joint_rewards[key] - reward_mean)/reward_mean for key in joint_rewards.keys()}
-
-        # for key in joint_reward_deviations.keys():
-        #     new_reward_weight = getattr(self._reward_weights, key) - self._auto_reward_adjust_params.learning_rate * joint_reward_deviations[key]
-        #     setattr(self._reward_weights, key, new_reward_weight)
-        # subprocvec_env:SubprocVecEnv = self.model.get_env()
-        # subprocvec_env.env_method('set_reward_weights', self._reward_weights)
-        # print(f"DEBUG:: {self._reward_weights=}")
 
 
 ##############################################################################

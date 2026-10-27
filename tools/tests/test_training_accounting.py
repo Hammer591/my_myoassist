@@ -132,3 +132,61 @@ def test_real_ppo_rollout_writes_consistent_imitation_log(tmp_path):
             assert record["target_velocity_stats"]["min"] == record["target_velocity_stats"]["max"] == 1.25
     finally:
         env.close()
+
+
+def test_sparse_checkpoints_evaluate_current_imitation_record_and_save_final(tmp_path, monkeypatch):
+    import json
+    from rl_train.envs.environment_handler import EnvironmentHandler
+    from rl_train.train.train_configs.config_imiatation_exo import ExoImitationTrainSessionConfig
+    from rl_train.utils import learning_callback
+
+    config = ExoImitationTrainSessionConfig()
+    config.logger_params.logging_frequency = 4
+    config.logger_params.evaluate_frequency = 8
+    handler = TrainLogHandler(str(tmp_path))
+    cb = EnvironmentHandler.get_callback(config, handler)
+    cb.model = callback(tmp_path).model
+    saved, evaluated = [], []
+    cb.model.save = lambda path: saved.append(cb.model.num_timesteps)
+    cb._init_callback()
+
+    class Pool:
+        def apply(self, fn, args):
+            records = json.loads((tmp_path / "train_log.json").read_text())["log_datas"]
+            latest = records[-1]
+            # The evaluation worker must read this rollout, including imitation metadata.
+            assert latest["num_timesteps"] == cb.model.num_timesteps
+            assert "reward_weights" in latest and "reward_accumulate" in latest
+            evaluated.append(latest["num_timesteps"])
+
+        def close(self):
+            pass
+
+        def join(self):
+            pass
+
+    monkeypatch.setattr(learning_callback, "get_context", lambda method: SimpleNamespace(Pool=lambda **kw: Pool()))
+    for _ in range(17):
+        rewards = {key: 0.0 for key in cb.reward_accumulate}
+        rewards["dense"] = 1.0
+        step(cb, [1], [True], [{"rwd_dict": rewards}])
+        cb._on_rollout_end()
+    assert saved == [1, 4, 8, 12, 16]
+    assert evaluated == [8, 16]
+    cb._on_training_end()
+    assert saved == [1, 4, 8, 12, 16, 17]
+    assert evaluated == [8, 16]
+    assert handler.log_datas[-1].num_timesteps == 17
+    assert handler.log_datas[-1].completed_episodes == 1
+    assert handler.log_datas[-1].average_reward_per_episode == 1
+
+
+def test_final_checkpoint_refreshes_post_update_weights_without_duplicate_log(tmp_path):
+    cb = callback(tmp_path)
+    saved = []
+    cb.model.save = lambda path: saved.append(path)
+    step(cb, [1], [True])
+    cb._on_rollout_end()
+    cb._on_training_end()
+    assert len(saved) == 2 and saved[0] == saved[1]
+    assert len(cb.train_log_handler.log_datas) == 1

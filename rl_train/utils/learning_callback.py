@@ -20,6 +20,8 @@ class BaseCustomLearningCallback(BaseCallback):
         super().__init__(verbose)
         self.log_rollout_freq = log_rollout_freq
         self.evaluate_freq = evaluate_freq
+        if self.log_rollout_freq <= 0 or self.evaluate_freq <= 0:
+            raise ValueError("Checkpoint and evaluation frequencies must be positive rollout counts")
         self.train_log_handler: train_log_handler.TrainLogHandler = log_handler
         self.log_count = 0
 
@@ -87,13 +89,29 @@ class BaseCustomLearningCallback(BaseCallback):
     def _on_rollout_start(self) -> None:
         super()._on_rollout_start()
 
-    def _on_rollout_end(self, write_log: bool = True) -> TrainCheckpointData | None:
+    def _prepare_log_data(self, log_data: TrainCheckpointData) -> TrainCheckpointData:
+        return log_data
+
+    def _on_training_end(self) -> None:
+        # PPO updates after on_rollout_end. Refresh the final weights even if a checkpoint
+        # was just recorded, and append a final record if the last rollout was between saves.
+        records = self.train_log_handler.log_datas
+        if records and records[-1].num_timesteps == self.model.num_timesteps:
+            self.model.save(self.train_log_handler.get_path2save_model(self.model.num_timesteps))
+        else:
+            self._on_rollout_end(force_log=True, run_evaluation=False)
+
+    def _on_rollout_end(
+        self, write_log: bool = True, *, force_log: bool = False, run_evaluation: bool = True
+    ) -> TrainCheckpointData | None:
         super()._on_rollout_end()
 
         self.prev_logging_timestep = self.num_timesteps
 
         log_data = None
-        if self.log_count % self.log_rollout_freq == 0:
+        rollout_number = self.log_count + 1
+        evaluate_due = run_evaluation and rollout_number % self.evaluate_freq == 0
+        if force_log or rollout_number == 1 or rollout_number % self.log_rollout_freq == 0 or evaluate_due:
             model_path = self.train_log_handler.get_path2save_model(self.model.num_timesteps)
             self.model.save(model_path)
 
@@ -150,6 +168,7 @@ class BaseCustomLearningCallback(BaseCallback):
                 termination_counts=self.termination_counts.copy(),
                 time=f"{datetime.now().strftime('%Y%m%d-%H%M%S.%f')}",
             )
+            log_data = self._prepare_log_data(log_data)
             if write_log:
                 self.train_log_handler.add_log_data(log_data)
                 self.train_log_handler.write_json_file()
@@ -162,7 +181,7 @@ class BaseCustomLearningCallback(BaseCallback):
             self.target_velocities = []
             self.termination_counts = {}
 
-        if self.log_count % self.evaluate_freq == 0 and self.log_count != 0:
+        if evaluate_due and write_log:
             # Create new pool each time to prevent memory leaks
 
             # For debug:

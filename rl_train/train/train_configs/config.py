@@ -25,6 +25,8 @@ class TrainSessionConfigBase:
             # muscle weight of 10, an exo weight of 0.1 makes one device actuator's effort about
             # ten times cheaper than one muscle's. Default 0 keeps existing configs unchanged.
             exo_activation_penalty: float = 0.0
+            # Penalise changes in the requested, normalised device action (not filtered output).
+            exo_action_diff_penalty: float = 0.0
             muscle_activation_diff_penalty: float = 0.1
 
             # for reward per step
@@ -37,6 +39,26 @@ class TrainSessionConfigBase:
             foot_force_penalty: float = 0.0
 
         reward_keys_and_weights: RewardWeights = field(default_factory=RewardWeights)
+
+        @dataclass
+        class RobustnessParams:
+            enabled: bool = False
+            enable_in_evaluation: bool = False
+            # Explicit body names avoid accidentally scaling attached device bodies.
+            human_body_names: list[str] = field(default_factory=list)
+            human_mass_scale_range: list[float] = field(default_factory=lambda: [1.0, 1.0])
+            human_inertia_scale_range: list[float] = field(default_factory=lambda: [1.0, 1.0])
+            muscle_strength_scale_range: list[float] = field(default_factory=lambda: [1.0, 1.0])
+            # Scalars or per-channel lists in physical observation units, before VecNormalize.
+            observation_noise_std: dict = field(default_factory=dict)
+            observation_bias_std: dict = field(default_factory=dict)
+            observation_delay_steps_range: list[int] = field(default_factory=lambda: [0, 0])
+            # Delay resolution is a physics tick; tau=0 means ideal bandwidth.
+            motor_delay_seconds_range: list[float] = field(default_factory=lambda: [0.0, 0.0])
+            motor_time_constant_seconds_range: list[float] = field(default_factory=lambda: [0.0, 0.0])
+            motor_gain_scale_range: list[float] = field(default_factory=lambda: [1.0, 1.0])
+
+        robustness: RobustnessParams = field(default_factory=RobustnessParams)
 
         env_id: str = ""
         num_envs: int = 1

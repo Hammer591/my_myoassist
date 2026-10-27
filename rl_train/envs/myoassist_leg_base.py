@@ -72,6 +72,9 @@ class MyoAssistLegBase(env_base.MujocoEnv):
         self.CUSTOM_MAX_EPISODE_STEPS = env_params.custom_max_episode_steps
 
         self._prev_muscle_activations_for_reward = None
+        self._prev_device_action = None
+        self._exo_action_diff_cost = 0.0
+        self._robustness = None
 
         # Device (non-muscle) actuators, and the scale that turns each one's ctrl into a
         # dimensionless effort in [0, 1]. Identified by dynamics type rather than by index so
@@ -214,6 +217,11 @@ class MyoAssistLegBase(env_base.MujocoEnv):
         for _ in range(30):
             super().step(a=np.zeros(self.sim.model.nu))
 
+        from rl_train.envs.robustness import Robustness
+
+        self._robustness = Robustness(self, env_params.robustness)
+        self._robustness.reset()
+
     # override from MujocoEnv
     def get_obs_dict(self, sim):
         # TODO observation - tx exclude
@@ -333,6 +341,7 @@ class MyoAssistLegBase(env_base.MujocoEnv):
             "forward_reward": forward_reward,
             "muscle_activation_penalty": muscle_activation_penalty,
             "exo_activation_penalty": exo_activation_penalty,
+            "exo_action_diff_penalty": -self.dt * self._exo_action_diff_cost,
             "muscle_activation_diff_penalty": muscle_activation_diff_penalty,
             "foot_force_penalty": foot_force_penalty,
             "joint_constraint_force_penalty": joint_constraint_force_penalty,
@@ -367,12 +376,42 @@ class MyoAssistLegBase(env_base.MujocoEnv):
 
     def step(self, a, **kwargs):
         self._modulate_target_velocity()
-        next_obs, reward, terminated, truncated, info = super().step(a, **kwargs)
+        a = np.clip(np.asarray(a), self.action_space.low, self.action_space.high)
+        device_action = a[self._device_actuator_ids].copy()
+        # Penalise the policy's requested action, so filtering cannot hide oscillatory commands.
+        self._exo_action_diff_cost = (
+            float(np.mean(np.square(device_action - self._prev_device_action)))
+            if self._prev_device_action is not None and device_action.size else 0.0
+        )
+        self._prev_device_action = device_action
+        robustness = self._robustness
+        if robustness is not None and robustness.active and robustness.motor_active and len(self._device_actuator_ids):
+            # Retain MyoSuite's actuator mapping and limits, then model motor dynamics at
+            # physics rate. Calling forward just once keeps rewards/step accounting correct.
+            ctrl = self.robot.process_actuator(
+                controls=a, step_duration=self.dt, normalized=self.normalize_act,
+                position_limits=True, velocity_limits=True, out_space="sim",
+            )
+            ids = self._device_actuator_ids
+            desired = ctrl[ids].copy()
+            physics_dt = float(self.sim.model.opt.timestep)
+            for _ in range(self.frame_skip):
+                ctrl[ids] = robustness.motor_control(desired, physics_dt, self.sim.model.actuator_ctrlrange[ids])
+                self.sim.data.ctrl[:] = ctrl
+                self.sim.advance(substeps=1, render=False)
+            self.last_ctrl = ctrl.copy()
+            next_obs, reward, terminated, truncated, info = self.forward(**kwargs)
+        else:
+            next_obs, reward, terminated, truncated, info = super().step(a, **kwargs)
+        if robustness is not None:
+            next_obs = robustness.observe(next_obs)
         self._step_count_per_episode += 1
         is_over_time_limit = self._step_count_per_episode >= self.CUSTOM_MAX_EPISODE_STEPS
         info = dict(info)
         info["target_velocity"] = float(self._target_velocity)
         info["termination_reasons"] = []
+        if robustness is not None and robustness.active:
+            info["robustness"] = dict(robustness.sample)
         if self._get_done():
             info["termination_reasons"].append("height")
         if is_over_time_limit:
@@ -453,6 +492,8 @@ class MyoAssistLegBase(env_base.MujocoEnv):
     def _prepare_reset_target(self, seed):
         if seed is not None:
             self.seed(seed)
+        if self._robustness is not None:
+            self._robustness.reset()
         if not self.is_evaluate_mode:
             self._change_mode_and_target_velocity_randomly()
 
@@ -460,6 +501,8 @@ class MyoAssistLegBase(env_base.MujocoEnv):
         if not _target_prepared:
             self._prepare_reset_target(seed)
         self._step_count_per_episode = 0
+        self._prev_device_action = None
+        self._exo_action_diff_cost = 0.0
         self.sim.data.joint("pelvis_tx").qvel[0] = self._target_velocity
 
         self.sim.forward()
@@ -472,9 +515,13 @@ class MyoAssistLegBase(env_base.MujocoEnv):
 
         # generate resets
         # obs = super().reset(reset_qpos= self.sim.data.qpos, reset_qvel=self.sim.data.qvel, **kwargs)
-        obs = super().reset(seed=seed, **kwargs)
+        obs, info = super().reset(seed=seed, **kwargs)
         self._prev_step_changed_time = self.sim.data.time
-        return obs
+        if self._robustness is not None:
+            obs = self._robustness.observe(obs)
+            if self._robustness.active:
+                info["robustness"] = dict(self._robustness.sample)
+        return obs, info
 
     def _get_done(self):
         pelvis_height = self.sim.data.joint("pelvis_ty").qpos[0].copy()

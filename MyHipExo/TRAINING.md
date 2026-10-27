@@ -20,6 +20,21 @@
 
 ## 开始训练
 
+人体参数随机化、传感器误差和电机延迟/带宽的可选配置见
+[鲁棒训练说明](../docs/reinforcement-learning/08_robustness.md)。旧配置默认关闭这些功能。
+
+5000 万步、温和随机化、关闭电机动作平滑奖励的配置：
+
+```bash
+MUJOCO_GL=egl MPLBACKEND=Agg MPLCONFIGDIR=/tmp/myoassist_mpl \
+MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 \
+  .my_venv/bin/python -m rl_train.run_train \
+  --config_file_path rl_train/train/train_configs/imitation_22_PhotoHipExo_L1_robustness_50M_20Nm.json
+```
+
+该配置使用 32 环境，checkpoint 每 16 个 rollout 保存，relaxed 评估每 128 个 rollout 触发。
+实际采样补齐完整 rollout 至 50,003,968 步；结束时保存最后一次更新后的权重。
+
 从项目根目录运行：
 
 ```bash
