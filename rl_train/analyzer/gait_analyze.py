@@ -178,6 +178,9 @@ class GaitAnalyzer:
 
     def get_toe_off_average(self, *, is_right_foot_based: bool):
         gait_segment_index = self.get_gait_segment_index(is_right_foot_based=is_right_foot_based)
+        if not gait_segment_index:
+            side = "right" if is_right_foot_based else "left"
+            raise ValueError(f"No complete gait cycles detected for {side} leg; cycle statistics skipped")
         toe_off_cycles = []
         for start_idx, toe_off_idx, end_idx in gait_segment_index:
             toe_off_cycle = (toe_off_idx - start_idx) / (end_idx - start_idx)
@@ -426,7 +429,6 @@ class GaitAnalyzer:
         result_dir,
     ) -> None:
         # Plot individual segments
-        fig, axes = plt.subplots(1, 2, figsize=(3.5 * self.fig_size_multiplier, 2 * self.fig_size_multiplier), dpi=self.dpi)
 
         exo_data_l = self.gait_data.series_data["actuator_data"]["Exo_L"]
         exo_data_r = self.gait_data.series_data["actuator_data"]["Exo_R"]
@@ -441,6 +443,8 @@ class GaitAnalyzer:
         # Draw toe-off reference lines (average cycle percentage)
         toe_off_r = self.get_toe_off_average(is_right_foot_based=True) * 100
         toe_off_l = self.get_toe_off_average(is_right_foot_based=False) * 100
+
+        fig, axes = plt.subplots(1, 2, figsize=(3.5 * self.fig_size_multiplier, 2 * self.fig_size_multiplier), dpi=self.dpi)
 
         for idx, (start_idx, toe_off_idx, end_idx) in enumerate(right_gait_segment_index):
             exo_r_data = [-v[0] for v in exo_data_r["force"][start_idx:end_idx]]
@@ -547,11 +551,12 @@ class GaitAnalyzer:
         *,
         result_dir,
     ) -> None:
-        fig, axes = plt.subplots(3, 2, figsize=(5 * self.fig_size_multiplier, 3 * self.fig_size_multiplier), dpi=self.dpi)
 
         # Draw toe-off reference lines (average cycle percentage)
         toe_off_r = self.get_toe_off_average(is_right_foot_based=True) * 100
         toe_off_l = self.get_toe_off_average(is_right_foot_based=False) * 100
+
+        fig, axes = plt.subplots(3, 2, figsize=(5 * self.fig_size_multiplier, 3 * self.fig_size_multiplier), dpi=self.dpi)
 
         joint_data = self.gait_data.series_data["joint_data"]
         gait_segment_index_r = self.get_gait_segment_index(is_right_foot_based=True)
