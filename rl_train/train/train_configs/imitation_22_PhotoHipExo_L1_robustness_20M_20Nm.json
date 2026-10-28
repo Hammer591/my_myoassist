@@ -239,6 +239,31 @@
             "enabled": true,
             "initial_threshold": 0.3,
             "anneal_timesteps": 5000000
+        },
+        "imitation_reward": {
+            "mode": "normalized",
+            "qpos_weight": 4.0,
+            "qvel_weight": 1.0,
+            "qpos_error_scales": {
+                "pelvis_ty": 0.03,
+                "pelvis_tilt": 0.1,
+                "hip_flexion_l": 0.15,
+                "hip_flexion_r": 0.15,
+                "knee_angle_l": 0.15,
+                "knee_angle_r": 0.15,
+                "ankle_angle_l": 0.15,
+                "ankle_angle_r": 0.15
+            },
+            "qvel_error_scales": {
+                "pelvis_ty": 0.2,
+                "pelvis_tilt": 0.5,
+                "hip_flexion_l": 1.0,
+                "hip_flexion_r": 1.0,
+                "knee_angle_l": 1.0,
+                "knee_angle_r": 1.0,
+                "ankle_angle_l": 1.0,
+                "ankle_angle_r": 1.0
+            }
         }
     },
     "ppo_params": {

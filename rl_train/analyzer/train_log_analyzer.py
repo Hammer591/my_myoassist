@@ -1,6 +1,7 @@
 from rl_train.utils.train_log_handler import TrainLogHandler
 import matplotlib.pyplot as plt
 import os
+from rl_train.utils.reward_weights import effective_reward_weights
 
 
 class TrainLogAnalyzer:
@@ -67,30 +68,16 @@ class TrainLogAnalyzer:
 
         # If mult_weights is True, multiply each reward by its corresponding weight
         if mult_weights:
-            reward_weights = {}
-            for key in valid_keys:
-                if key in reward_dict_data:  # Only process keys that exist in reward_dict_data
-                    # Check if the reward weight is a dictionary
-                    try:
-                        weight_value = modified_log_datas[0].reward_weights.get(key, 1.0)
-                        if isinstance(weight_value, dict):
-                            # Sum all values in the dictionary for each timestep
-                            reward_weights[key] = [
-                                sum(log_data.reward_weights.get(key, {}).values()) for log_data in modified_log_datas
-                            ]
-                        else:
-                            # Directly use the weight if it's not a dictionary
-                            reward_weights[key] = [log_data.reward_weights.get(key, 1.0) for log_data in modified_log_datas]
-                    except (KeyError, AttributeError):
-                        # print(f"Warning: Error accessing weight for key '{key}': {e}. Using default weight 1.0.")
-                        reward_weights[key] = [1.0] * len(modified_log_datas)
-
-            # Multiply each reward by its corresponding weight
-            for key in list(reward_dict_data.keys()):
-                if key in reward_weights:
-                    reward_dict_data[key] = [
-                        value * weight for value, weight in zip(reward_dict_data[key], reward_weights[key])
-                    ]
+            outer_weights = []
+            for log_data in modified_log_datas:
+                resolved = getattr(log_data, "effective_reward_weights", None)
+                if resolved is None:
+                    if getattr(log_data, "imitation_reward_mode", "legacy") == "normalized":
+                        raise ValueError("Normalized imitation log is missing effective_reward_weights")
+                    resolved = effective_reward_weights(getattr(log_data, "reward_weights", None) or {})
+                outer_weights.append(resolved)
+            for key, values in reward_dict_data.items():
+                reward_dict_data[key] = [value * weights.get(key, 1.0) for value, weights in zip(values, outer_weights)]
 
         # Final check: ensure we still have data to plot
         if not reward_dict_data:

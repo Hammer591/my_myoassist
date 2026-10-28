@@ -5,7 +5,6 @@ os.environ["GIT_PYTHON_REFRESH"] = "quiet"
 from myosuite.utils import gym
 from myosuite.envs import env_base
 from rl_train.train.train_configs.config import TrainSessionConfigBase
-from rl_train.utils.data_types import DictionableDataclass
 import collections
 from enum import Enum
 
@@ -155,14 +154,11 @@ class MyoAssistLegBase(env_base.MujocoEnv):
         # ref 50hz: 500hz 10skip: 20 * 500 / 1000
 
         frame_skip = env_params.physics_sim_framerate // env_params.control_framerate
-        original_reward_dict = DictionableDataclass.to_dict(env_params.reward_keys_and_weights)
-        self.rwd_keys_wt = {}
-        for key, value in original_reward_dict.items():
-            if isinstance(value, dict):
-                weight_sum = sum(value.values())
-                self.rwd_keys_wt[key] = weight_sum
-            else:
-                self.rwd_keys_wt[key] = value
+        from rl_train.utils.reward_weights import effective_reward_weights
+
+        self.rwd_keys_wt = effective_reward_weights(
+            env_params.reward_keys_and_weights, getattr(env_params, "imitation_reward", None)
+        )
 
         self._initialize_pose()
 
@@ -381,7 +377,8 @@ class MyoAssistLegBase(env_base.MujocoEnv):
         # Penalise the policy's requested action, so filtering cannot hide oscillatory commands.
         self._exo_action_diff_cost = (
             float(np.mean(np.square(device_action - self._prev_device_action)))
-            if self._prev_device_action is not None and device_action.size else 0.0
+            if self._prev_device_action is not None and device_action.size
+            else 0.0
         )
         self._prev_device_action = device_action
         robustness = self._robustness
@@ -389,8 +386,12 @@ class MyoAssistLegBase(env_base.MujocoEnv):
             # Retain MyoSuite's actuator mapping and limits, then model motor dynamics at
             # physics rate. Calling forward just once keeps rewards/step accounting correct.
             ctrl = self.robot.process_actuator(
-                controls=a, step_duration=self.dt, normalized=self.normalize_act,
-                position_limits=True, velocity_limits=True, out_space="sim",
+                controls=a,
+                step_duration=self.dt,
+                normalized=self.normalize_act,
+                position_limits=True,
+                velocity_limits=True,
+                out_space="sim",
             )
             ids = self._device_actuator_ids
             desired = ctrl[ids].copy()

@@ -7,6 +7,7 @@ from rl_train.utils import train_log_handler
 from rl_train.utils.learning_callback import BaseCustomLearningCallback
 from rl_train.utils.train_checkpoint_data_imitation import ImitationTrainCheckpointData
 from rl_train.train.train_configs.config_imitation import ImitationTrainSessionConfig
+from rl_train.utils.reward_weights import effective_reward_weights
 ################################################################
 
 
@@ -21,6 +22,7 @@ class ImitationCustomLearningCallback(BaseCustomLearningCallback):
         auto_reward_adjust_params: ImitationTrainSessionConfig.AutoRewardAdjustParams,
         trajectory_curriculum=None,
         final_trajectory_threshold: float = 0.2,
+        imitation_reward=None,
         verbose=1,
     ):
         super().__init__(
@@ -31,6 +33,7 @@ class ImitationCustomLearningCallback(BaseCustomLearningCallback):
         self._trajectory_curriculum = trajectory_curriculum
         self._final_trajectory_threshold = final_trajectory_threshold
         self._training_trajectory_threshold = None
+        self._imitation_reward = imitation_reward
 
     def _on_training_start(self):
         # Loaded checkpoints retain their lifetime step counter. The curriculum uses
@@ -79,6 +82,8 @@ class ImitationCustomLearningCallback(BaseCustomLearningCallback):
             reward_weights=DictionableDataclass.to_dict(self._reward_weights),
             reward_accumulate=self.reward_accumulate.copy(),
             training_trajectory_threshold=self._training_trajectory_threshold,
+            effective_reward_weights=effective_reward_weights(self._reward_weights, self._imitation_reward),
+            imitation_reward_mode=self._imitation_reward.mode if self._imitation_reward is not None else "legacy",
         )
 
 
@@ -115,6 +120,8 @@ class MyoAssistLegImitation(MyoAssistLegBase):
         self.reference_data_keys = env_params.reference_data_keys
         self._loop_reference_data = loop_reference_data
         self._reward_keys_and_weights: ImitationTrainSessionConfig.EnvParams.RewardWeights = env_params.reward_keys_and_weights
+        self._imitation_reward = env_params.imitation_reward
+        self._imitation_reward.validate(self._reward_keys_and_weights)
 
         self.setup_reference_data(data=reference_data)
 
@@ -135,12 +142,12 @@ class MyoAssistLegImitation(MyoAssistLegBase):
         return super().get_obs_dict(sim)
 
     def _get_qpos_diff(self) -> dict:
+        # MyoSuite requests rewards once during setup, before the first reset.
+        # Indexing the reference with None would select the entire trajectory.
+        index = 0 if self._imitation_index is None else self._imitation_index
 
         def get_qpos_diff_one(key: str):
-            diff = (
-                self.sim.data.joint(f"{key}").qpos[0].copy()
-                - self._reference_data["series_data"][f"q_{key}"][self._imitation_index]
-            )
+            diff = self.sim.data.joint(f"{key}").qpos[0].copy() - self._reference_data["series_data"][f"q_{key}"][index]
             return diff
 
         name_diff_dict = {}
@@ -149,14 +156,13 @@ class MyoAssistLegImitation(MyoAssistLegBase):
         return name_diff_dict
 
     def _get_qvel_diff(self):
-        speed_ratio_to_target_velocity = (
-            self._target_velocity / self._reference_data["series_data"]["dq_pelvis_tx"][self._imitation_index]
-        )
+        index = 0 if self._imitation_index is None else self._imitation_index
+        speed_ratio_to_target_velocity = self._target_velocity / self._reference_data["series_data"]["dq_pelvis_tx"][index]
 
         def get_qvel_diff_one(key: str):
             diff = (
                 self.sim.data.joint(f"{key}").qvel[0].copy()
-                - self._reference_data["series_data"][f"dq_{key}"][self._imitation_index] * speed_ratio_to_target_velocity
+                - self._reference_data["series_data"][f"dq_{key}"][index] * speed_ratio_to_target_velocity
             )
             return diff
 
@@ -187,25 +193,34 @@ class MyoAssistLegImitation(MyoAssistLegBase):
         dq_diff_dict = self._get_qvel_diff()
         anchor_diff_array = self._get_end_effector_diff()
 
-        # Calculate joint position rewards
-        q_reward_dict = {}
-        for joint_name, diff in q_diff_dict.items():
-            q_reward_dict[joint_name] = self.dt * np.exp(-8 * np.square(diff))
-
-        dq_reward_dict = {}
-        for joint_name, diff in dq_diff_dict.items():
-            dq_reward_dict[joint_name] = self.dt * np.exp(-8 * np.square(diff))
-
         # Calculate end effector reward
         anchor_reward = self.dt * np.mean(np.exp(-5 * np.square(anchor_diff_array)))
 
-        # Calculate joint imitation rewards sum
-        qpos_imitation_rewards = np.sum(
-            [q_reward_dict[key] * self._reward_keys_and_weights.qpos_imitation_rewards[key] for key in q_reward_dict.keys()]
-        )
-        qvel_imitation_rewards = np.sum(
-            [dq_reward_dict[key] * self._reward_keys_and_weights.qvel_imitation_rewards[key] for key in dq_reward_dict.keys()]
-        )
+        if self._imitation_reward.mode == "normalized":
+            qpos_imitation_rewards = self._normalized_imitation_reward(
+                q_diff_dict,
+                self._reward_keys_and_weights.qpos_imitation_rewards,
+                self._imitation_reward.qpos_error_scales,
+            )
+            qvel_imitation_rewards = self._normalized_imitation_reward(
+                dq_diff_dict,
+                self._reward_keys_and_weights.qvel_imitation_rewards,
+                self._imitation_reward.qvel_error_scales,
+            )
+        else:
+            # Preserve the historical component and outer-weight semantics.
+            qpos_imitation_rewards = np.sum(
+                [
+                    self.dt * np.exp(-8 * np.square(diff)) * self._reward_keys_and_weights.qpos_imitation_rewards[key]
+                    for key, diff in q_diff_dict.items()
+                ]
+            )
+            qvel_imitation_rewards = np.sum(
+                [
+                    self.dt * np.exp(-8 * np.square(diff)) * self._reward_keys_and_weights.qvel_imitation_rewards[key]
+                    for key, diff in dq_diff_dict.items()
+                ]
+            )
 
         # Add new key-value pairs to the base_reward dictionary
         base_reward.update(
@@ -220,6 +235,18 @@ class MyoAssistLegImitation(MyoAssistLegBase):
         imitation_rewards = base_reward
         info = base_info
         return imitation_rewards, info
+
+    def _normalized_imitation_reward(self, errors, weights, scales):
+        total_weight = sum(weights.values())
+        if total_weight == 0:
+            return 0.0
+        # Return an unweighted component in [0, dt]. The overall coefficient is
+        # applied exactly once by get_reward_dict, separately from joint weights.
+        return self.dt * sum(
+            weight / total_weight * np.exp(-np.square(np.asarray(errors[joint]).item() / scales[joint]))
+            for joint, weight in weights.items()
+            if weight > 0
+        )
 
     # override from MujocoEnv
     def get_reward_dict(self, obs_dict):

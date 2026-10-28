@@ -49,7 +49,13 @@ def test_evaluation_never_uses_training_curriculum(mode, threshold, terminated, 
         assert env._out_of_trajectory_threshold == threshold
         env.reset(seed=1234)
         monkeypatch.setattr(env, "_get_done", lambda: False)
-        monkeypatch.setattr(env, "_get_qpos_diff", lambda: {"knee_angle_l": 0.25})
+        monkeypatch.setattr(
+            env,
+            "_get_qpos_diff",
+            lambda: {
+                key: 0.25 if key == "knee_angle_l" else 0.0 for key in env._reward_keys_and_weights.qpos_imitation_rewards
+            },
+        )
         _, _, done, _, info = env.step(np.zeros(env.action_space.shape))
         assert bool(done) == terminated
         assert ("trajectory:knee_angle_l" in info["termination_reasons"]) == terminated

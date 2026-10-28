@@ -14,6 +14,36 @@ class ImitationTrainSessionConfig(TrainSessionConfigBase):
     @dataclass
     class EnvParams(TrainSessionConfigBase.EnvParams):
         @dataclass
+        class ImitationReward:
+            # Legacy mode keeps historical checkpoints/configurations reproducible.
+            mode: str = "legacy"
+            qpos_weight: float = 4.0
+            qvel_weight: float = 1.0
+            qpos_error_scales: dict = field(default_factory=dict)
+            qvel_error_scales: dict = field(default_factory=dict)
+
+            def validate(self, reward_weights):
+                if self.mode not in {"legacy", "normalized"}:
+                    raise ValueError("imitation_reward.mode must be 'legacy' or 'normalized'")
+                if self.mode == "legacy":
+                    return
+                for kind in ("qpos", "qvel"):
+                    weight = getattr(self, f"{kind}_weight")
+                    if not math.isfinite(weight) or weight < 0:
+                        raise ValueError(f"{kind}_weight must be finite and nonnegative")
+                    joint_weights = getattr(reward_weights, f"{kind}_imitation_rewards")
+                    scales = getattr(self, f"{kind}_error_scales")
+                    for joint, joint_weight in joint_weights.items():
+                        if not math.isfinite(joint_weight) or joint_weight < 0:
+                            raise ValueError(f"{kind} joint weight for {joint} must be finite and nonnegative")
+                        if joint_weight > 0 and (joint not in scales or not math.isfinite(scales[joint]) or scales[joint] <= 0):
+                            raise ValueError(f"{kind}_error_scales requires a finite positive scale for {joint}")
+                    if weight > 0 and not sum(joint_weights.values()) > 0:
+                        raise ValueError(f"{kind} requires at least one positive joint weight")
+
+        imitation_reward: ImitationReward = field(default_factory=ImitationReward)
+
+        @dataclass
         class TrajectoryCurriculum:
             enabled: bool = False
             initial_threshold: float = 0.3

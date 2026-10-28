@@ -258,6 +258,7 @@ class EnvironmentHandler:
                 auto_reward_adjust_params=config.auto_reward_adjust_params,
                 trajectory_curriculum=config.env_params.trajectory_curriculum,
                 final_trajectory_threshold=config.env_params.out_of_trajectory_threshold,
+                imitation_reward=config.env_params.imitation_reward,
             )
         else:
             custom_callback = learning_callback.BaseCustomLearningCallback(

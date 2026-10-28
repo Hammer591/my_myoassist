@@ -23,7 +23,7 @@ MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 \
 完整 rollout 会将从零开始的实际总步数补齐至 20,004,864，步数为所有环境的合计，
 不是 PPO 更新轮数。2000 万步是预算，不保证收敛；原 50M 配置保留用于复现实验。
 
-新配置只增加轨迹阈值课程，奖励、PPO、人体/传感器/电机扰动与 50M 配置相同。
+新配置采用下述归一化模仿奖励和轨迹阈值课程，PPO、人体/传感器/电机扰动与 50M 配置相同。
 前 500 万新增环境步将训练阈值由 0.3 线性收紧至 0.2，剩余训练保持 0.2。
 阈值在每次 rollout 开始时同步到所有 worker，达到 500 万步后的首个 rollout 使用 0.2；
 日志字段 `training_trajectory_threshold` 记录该批次采样实际使用的值。
@@ -53,7 +53,7 @@ MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 \
 回调使用从 1 开始的 rollout 编号；完整模仿学习记录写入后才启动评估，避免读取上一次保存的记录。
 短程示例保持原有评估间隔 1000，checkpoint 间隔从 1 增至 16。
 
-训练评估和独立 replay 默认均为 `relaxed`，长程配置也显式指定此模式。
+独立 replay 默认使用 `relaxed`；20M 配置显式安排 relaxed 和 strict 两种评估。
 该模式将参考轨迹偏差阈值放宽至 1e6、回合步数上限放宽至 1e9；
 保留骨盆高度低于 0.7 m 等结束条件，结束时停止单回合回放，不拼接 reset 后的片段。
 
@@ -62,6 +62,43 @@ MPLCONFIGDIR=/tmp/myoassist_mpl MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 \
   .my_venv/bin/python -m rl_train.run_train \
   --config_file_path rl_train/train/train_configs/imitation_22_PhotoHipExo_L1_robustness_example_20Nm.json
 ```
+
+## 归一化模仿奖励
+
+20M 配置设置 `env_params.imitation_reward.mode="normalized"`，每类模仿项按以下公式计算：
+
+```text
+component = dt * sum(w_j / sum(w) * exp(-(error_j / scale_j)^2))
+contribution = overall_weight * component
+```
+
+`reward_keys_and_weights.qpos_imitation_rewards` 和 `qvel_imitation_rewards` 的字典只表示
+关节相对重要性。将整组关节权重同比例放大，不会改变奖励；整体强度由
+`imitation_reward.qpos_weight=4.0`、`qvel_weight=1.0` 单独控制。
+两项在零误差下的每秒贡献上限分别为 4 和 1。原 50M 配置的上限为 15.21 和 1。
+每个有正权重的关节都必须配置有限且大于零的误差尺度，缺失或非法值在创建环境时直接报错。
+
+| 关节 | qpos_error_scales | qvel_error_scales |
+|---|---:|---:|
+| pelvis_ty | 0.03 m | 0.2 m/s |
+| pelvis_tilt | 0.1 rad | 0.5 rad/s |
+| 左右髋、膝、踝 | 0.15 rad | 1.0 rad/s |
+
+尺度表示单关节得分下降到 exp(-1)（约 36.8%）时的误差，不是终止阈值。
+膝踝角度误差为 0.2 rad 时，单关节得分约 16.9%，原公式约为 72.6%。
+该设计仍是加权平均奖励，不能保证所有关节始终合格；严格终止条件继续独立检查任意关节越界。
+以上参数用于首轮对照，并非已验证的最优值；要按固定严格评估、速度误差、回合完成率及肌肉用力判断效果。
+
+本次仅改变奖励聚合与误差尺度。原有参考相位推进、qvel 的瞬时速度比缩放和策略观测接口保持现状，
+因此参考位置/速度一致性和相位信息缺失仍需独立诊断；不能将本次调整视为已解决全部轨迹偏离问题。
+人体用力、外骨骼用力、动作变化和速度跟踪等其他奖励公式与权重保持原值。
+
+新日志保存 `imitation_reward_mode` 和 `effective_reward_weights`。加权贡献图优先使用
+每条日志记录的实际外层系数，避免再次乘关节权重总和；没有新字段的历史日志继续使用旧口径。
+`reward_log_schema_version=2` 仍表示回合累计统计口径，奖励公式版本另由 mode 区分。
+旧配置省略 `imitation_reward` 时默认 `legacy`，保留历史奖励及图表语义。
+新旧公式的总奖励数值不可直接作为性能提升对比。建议用20M新配置从零训练作为清晰基线，
+也可加载旧检查点微调，但旧价值网络和优化器状态来自旧奖励尺度，初期需观察价值损失。
 
 ## 回合级参数采样
 
