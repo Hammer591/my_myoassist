@@ -25,6 +25,9 @@ class TrainSessionConfigBase:
             # muscle weight of 10, an exo weight of 0.1 makes one device actuator's effort about
             # ten times cheaper than one muscle's. Default 0 keeps existing configs unchanged.
             exo_activation_penalty: float = 0.0
+            # Extra quadratic + quartic cost above a physical joint-torque threshold.
+            # Default zero preserves historical rewards and non-torque device models.
+            exo_torque_excess_penalty: float = 0.0
             # Penalise changes in the requested, normalised device action (not filtered output).
             exo_action_diff_penalty: float = 0.0
             muscle_activation_diff_penalty: float = 0.1
@@ -39,6 +42,8 @@ class TrainSessionConfigBase:
             foot_force_penalty: float = 0.0
 
         reward_keys_and_weights: RewardWeights = field(default_factory=RewardWeights)
+        exo_torque_soft_limit_nm: float = 15.0
+        exo_torque_excess_scale_nm: float = 5.0
 
         @dataclass
         class RobustnessParams:

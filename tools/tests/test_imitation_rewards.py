@@ -114,8 +114,10 @@ def test_real_ppo_logs_reconstruct_normalized_return(tmp_path):
             assert weights["qvel_imitation_rewards"] == 1
             assert weights["exo_activation_penalty"] == 0.1
             assert weights["exo_action_diff_penalty"] == 0.05
+            assert weights["exo_torque_excess_penalty"] == 2.0
             assert components["exo_activation_penalty"] < 0
             assert components["exo_action_diff_penalty"] < 0
+            assert components["exo_torque_excess_penalty"] < 0
             assert sum(components[k] * w for k, w in weights.items()) == pytest.approx(record["average_reward_per_episode"])
             assert components["dense"] == pytest.approx(record["average_reward_per_episode"])
     finally:

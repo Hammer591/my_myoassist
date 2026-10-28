@@ -31,13 +31,23 @@ from stable_baselines3 import PPO
 class MirrorPPO(PPO):
     """PPO plus a mirror-symmetry penalty on the policy mean action.
 
-    ``mirror_coef <= 0`` disables the penalty, making this exactly PPO.
+    ``mirror_coef == 0`` disables the penalty, making this exactly PPO.
     """
 
     def __init__(
         self, *args, mirror_coef: float = 0.0, obs_perm=None, act_perm=None, n_muscle_actuators: int | None = None, **kwargs
     ):
         super().__init__(*args, **kwargs)
+        self.configure_mirror(mirror_coef, obs_perm, act_perm, n_muscle_actuators)
+
+    def configure_mirror(self, mirror_coef, obs_perm=None, act_perm=None, n_muscle_actuators=None):
+        """Restore mirror settings after SB3 loads either PPO or MirrorPPO weights.
+
+        SB3 constructs the algorithm without custom arguments before restoring its
+        state. Rebuild permutations from the current composed model on its device.
+        """
+        if not np.isfinite(mirror_coef) or mirror_coef < 0:
+            raise ValueError("mirror_coef must be finite and nonnegative")
         self.mirror_coef = float(mirror_coef)
         if self.mirror_coef > 0:
             if obs_perm is None or act_perm is None:
@@ -92,4 +102,5 @@ class MirrorPPO(PPO):
             self.logger.record("train/mirror_loss_muscle", float(muscle.mean()))
             if device.size:
                 self.logger.record("train/mirror_loss_device", float(device.mean()))
-                self.logger.record("train/mirror_device_grad_share", float(device.sum() / dims.sum()))
+                total = float(dims.sum())
+                self.logger.record("train/mirror_device_grad_share", float(device.sum()) / total if total > 0 else 0.0)

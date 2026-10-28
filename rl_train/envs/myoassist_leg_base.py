@@ -86,6 +86,28 @@ class MyoAssistLegBase(env_base.MujocoEnv):
 
         device_ids = [i for i in range(self.sim.model.nu) if self.sim.model.actuator_dyntype[i] != mujoco.mjtDyn.mjDYN_MUSCLE]
         self._device_actuator_ids = np.asarray(device_ids, dtype=int)
+        excess_weight = env_params.reward_keys_and_weights.exo_torque_excess_penalty
+        if not np.isfinite(excess_weight) or excess_weight < 0:
+            raise ValueError("exo_torque_excess_penalty must be finite and nonnegative")
+        self._exo_torque_excess_enabled = excess_weight > 0
+        self._exo_torque_soft_limit_nm = env_params.exo_torque_soft_limit_nm
+        self._exo_torque_excess_scale_nm = env_params.exo_torque_excess_scale_nm
+        if self._exo_torque_excess_enabled:
+            if (
+                not np.isfinite(self._exo_torque_soft_limit_nm)
+                or self._exo_torque_soft_limit_nm < 0
+                or not np.isfinite(self._exo_torque_excess_scale_nm)
+                or self._exo_torque_excess_scale_nm <= 0
+            ):
+                raise ValueError("Torque penalty requires a finite nonnegative soft limit and positive excess scale")
+            # Actuator force has torque units only after accounting for the joint gear.
+            # Reject tendon, body, slider and other transmissions instead of treating N as Nm.
+            ids = self._device_actuator_ids
+            if not len(ids) or np.any(self.sim.model.actuator_trntype[ids] != mujoco.mjtTrn.mjTRN_JOINT):
+                raise ValueError("Torque excess penalty requires direct hinge-joint device actuators")
+            joints = self.sim.model.actuator_trnid[ids, 0]
+            if np.any(self.sim.model.jnt_type[joints] != mujoco.mjtJoint.mjJNT_HINGE):
+                raise ValueError("Torque excess penalty requires direct hinge-joint device actuators")
 
         # Which entries of `data.act` belong to muscles. Not every device leaves `act` to the
         # muscles alone: UTAnkleExo_L2's two actuators declare `filter` dynamics, so na is 24 for
@@ -312,6 +334,7 @@ class MyoAssistLegBase(env_base.MujocoEnv):
         # helps even marginally; the measured signature of that is exo torque in early stance,
         # outside any window where a plantarflexion assist is physiological.
         exo_activation_penalty = -self.dt * self._get_device_effort()
+        exo_torque_excess_penalty = -self.dt * self._get_device_torque_excess_cost()
 
         joint_constraint_force_penalty = -self.dt * self._get_max_joint_constraint_force() / (model_weight)
 
@@ -337,6 +360,7 @@ class MyoAssistLegBase(env_base.MujocoEnv):
             "forward_reward": forward_reward,
             "muscle_activation_penalty": muscle_activation_penalty,
             "exo_activation_penalty": exo_activation_penalty,
+            "exo_torque_excess_penalty": exo_torque_excess_penalty,
             "exo_action_diff_penalty": -self.dt * self._exo_action_diff_cost,
             "muscle_activation_diff_penalty": muscle_activation_diff_penalty,
             "foot_force_penalty": foot_force_penalty,
@@ -541,6 +565,19 @@ class MyoAssistLegBase(env_base.MujocoEnv):
             return 0.0
         ctrl = self.sim.data.ctrl[self._device_actuator_ids]
         return float(np.mean(np.square(ctrl / self._device_ctrl_scale)))
+
+    def _get_device_torque_excess_cost(self):
+        """Physical output cost above the soft limit, averaged over device motors.
+
+        Use actual actuator force after motor dynamics and multiply by the joint
+        transmission gear. The cost and its first derivative are zero at the limit.
+        """
+        if not self._exo_torque_excess_enabled:
+            return 0.0
+        ids = self._device_actuator_ids
+        torques = self.sim.data.actuator_force[ids] * self.sim.model.actuator_gear[ids, 0]
+        excess = np.maximum(np.abs(torques) - self._exo_torque_soft_limit_nm, 0) / self._exo_torque_excess_scale_nm
+        return float(np.mean(np.square(excess) + np.power(excess, 4)))
 
     def _get_muscle_activation(self):
         # Muscle entries only. `data.act` also holds the activation state of any device actuator

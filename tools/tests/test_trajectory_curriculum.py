@@ -83,6 +83,7 @@ def test_curriculum_config_boundaries_and_unchanged_baseline():
     baseline_rewards = baseline["env_params"]["reward_keys_and_weights"].copy()
     assert current_rewards.pop("exo_activation_penalty") == 0.1
     assert current_rewards.pop("exo_action_diff_penalty") == 0.05
+    assert current_rewards.pop("exo_torque_excess_penalty") == 2.0
     assert baseline_rewards.pop("exo_activation_penalty") == 0
     assert baseline_rewards.pop("exo_action_diff_penalty") == 0
     assert current_rewards == baseline_rewards

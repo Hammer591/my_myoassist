@@ -143,6 +143,11 @@ class BaseCustomLearningCallback(BaseCallback):
                 policy_gradient_loss=get_logger_value("train/policy_gradient_loss"),
                 std=get_logger_value("train/std"),
                 value_loss=get_logger_value("train/value_loss"),
+                mirror_loss=get_logger_value("train/mirror_loss", None),
+                mirror_loss_weighted=get_logger_value("train/mirror_loss_weighted", None),
+                mirror_loss_muscle=get_logger_value("train/mirror_loss_muscle", None),
+                mirror_loss_device=get_logger_value("train/mirror_loss_device", None),
+                mirror_device_grad_share=get_logger_value("train/mirror_device_grad_share", None),
                 num_timesteps=self.model.num_timesteps,
                 average_num_timestep=(
                     np.sum(self.episode_length_counts) / np.sum(self.episode_counts)

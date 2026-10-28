@@ -45,6 +45,22 @@ MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 \
 新增课程参数位于 `env_params.trajectory_curriculum`：
 `enabled=true`、`initial_threshold=0.3`、`anneal_timesteps=5000000`。
 
+使用本地最新奖励及镜像续训修复，从本次提供的最新检查点追加3000万环境步：
+
+```bash
+MUJOCO_GL=egl MPLBACKEND=Agg MPLCONFIGDIR=/tmp/myoassist_mpl \
+MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 \
+  .my_venv/bin/python -m rl_train.run_train \
+  --config_file_path rl_train/train/train_configs/imitation_22_PhotoHipExo_L1_robustness_20M_20Nm.json \
+  --config.total_timesteps 30000000 \
+  --config.env_params.prev_trained_policy_path \
+  rl_train/results/train_session_20261028-204631/trained_models/model_33898496.zip
+```
+
+该命令按当前配置每侧±20 N·m、qpos系数8、15 N·m超额惩罚和镜像系数0.1续训。
+3000万步是本次新增预算，累计计数约到6389.85万步并补齐完整rollout；
+课程仍从本次新增步数计算，前500万步由0.3收紧至0.2。不会修改原JSON中的2000万步默认值。
+
 长程配置的 checkpoint/日志间隔从 8 改为 16 个 rollout（262,144 步），
 评估间隔从默认的 64 翻倍至 128 个 rollout（2,097,152 步）。
 它们都是固定 rollout 间隔，不是均分总步数后的固定评估次数。
@@ -107,6 +123,40 @@ PhotoHipExo 的用力惩罚为 `-0.1 * dt * mean((torque / 20 Nm)^2)`；
 前者持续满输出时每秒最多扣0.1，后者每步从-1跳到+1时每秒最多扣0.2。
 这两项是温和的优化代价，不改变每侧±20 Nm硬限制，也不限制模型必须在某相位输出。
 
+### 15 N·m以上的非线性超额惩罚
+
+当前方案使用每侧±20 N·m上限。
+在上述基础用力和动作变化惩罚之外，20M配置启用
+`exo_torque_excess_penalty=2.0`、`exo_torque_soft_limit_nm=15.0`、
+`exo_torque_excess_scale_nm=5.0`：
+
+```text
+torque = actual_actuator_force * joint_gear
+x = max(abs(torque) - 15 Nm, 0) / 5 Nm
+extra_reward = -dt * 2 * mean(x^2 + x^4)
+```
+
+使用电机动态作用后的实际输出，按左右电机平均；正负扭矩对称。
+额外代价在15 N·m以内为0，超过后严格递增，且增长速度加快；
+阈值处函数及一阶导数连续。仅支持直接驱动转动关节的设备执行器，
+其他传动类型启用此项会明确报错，避免将直线力误当成关节扭矩。
+新字段默认权重0，旧训练配置保留原奖励行为。
+
+| 两侧各自持续输出的绝对扭矩 | 每秒额外扣分（两侧平均） |
+|---|---:|
+| ≤15 N·m | 0 |
+| 16 N·m | 0.0832 |
+| 17 N·m | 0.3712 |
+| 18 N·m | 0.9792 |
+| 19 N·m | 2.0992 |
+| 20 N·m | 4.0000 |
+
+此表只列超额部分；原基础用力权重0.1、动作变化权重0.05继续生效。
+只允许超过15 N·m时付出更高优化代价，不把15 N·m作为硬截断。
+日志分项 `exo_torque_excess_penalty` 记录乘dt后的未加权负值，
+加权贡献图通过实际外层系数2计算其贡献。
+qpos系数8、放宽后的误差尺度、PPO、终止课程及训练预算保持上一轮设置。
+
 放宽的是奖励误差尺度，不是终止阈值。训练课程仍为0.3→0.2，严格评估仍为0.2；
 训练预算保持2000万环境步。新参数的稳定性、输出饱和比例和实际力矩平滑性需要重新训练评估。
 
@@ -116,6 +166,39 @@ PhotoHipExo 的用力惩罚为 `-0.1 * dt * mean((torque / 20 Nm)^2)`；
 旧配置省略 `imitation_reward` 时默认 `legacy`，保留历史奖励及图表语义。
 新旧公式的总奖励数值不可直接作为性能提升对比。建议用20M新配置从零训练作为清晰基线，
 也可加载旧检查点微调，但旧价值网络和优化器状态来自旧奖励尺度，初期需观察价值损失。
+
+## 镜像一致性与检查点续训
+
+20M配置的 `ppo_params.mirror_coef=0.1` 启用策略镜像一致性惩罚：
+
+```text
+L_mirror = mirror_coef * mean((pi(s) - M_action(pi(M_obs(s))))^2)
+```
+
+`M_obs` 交换左右关节状态、肌肉激活和足底传感器，`M_action` 交换左右肌肉与外骨骼动作。
+置换根据当前组合模型的执行器名称和观测布局生成。
+MirrorPPO在每轮PPO更新后执行镜像优化；该损失约束策略均值，不加入环境dense奖励，
+也不把同一时刻的左右扭矩强制设为相同，允许双腿交替发力。
+
+当前外骨骼左右控制器共享网络权重，镜像状态下的外骨骼均值动作已由网络结构保证一致。
+实际两腿输入处于不同相位，人体策略也可能不满足镜像一致性；因此有限回合中的平均扭矩仍可不同。
+完整策略镜像项同时约束人体控制。它不保证整条动力学轨迹严格对称，也不约束独立的探索噪声样本相同。
+
+从零训练、`prev_trained_policy_path`续训和显式检查点加载均按当前配置选择算法：
+`mirror_coef>0` 使用MirrorPPO，`mirror_coef=0` 使用普通PPO。
+历史普通PPO与MirrorPPO检查点都可加载；恢复后重新生成当前模型的镜像映射，
+保留策略权重、累计步数和优化器状态。此前续训分支固定调用PPO.load，虽保留了mirror_coef属性，
+实际不会运行镜像优化；本次修复这一路径。
+
+train_log.json新增以下训练损失字段：
+
+- `mirror_loss`、`mirror_loss_weighted`：原始镜像均方误差与加权优化损失。
+- `mirror_loss_muscle`、`mirror_loss_device`：人体与设备动作分组误差。
+- `mirror_device_grad_share`：沿用历史字段名，数值为设备动作平方误差在总平方误差中的占比，
+  不是实测梯度范数占比；共享外骨骼网络下该值可为0。
+
+首次PPO更新前或关闭镜像时，日志字段为null；历史日志缺失这些字段仍可读取。
+镜像误差为0时，设备占比记为0，避免除零产生NaN。该损失与力矩惩罚、qpos奖励分别记录。
 
 ## 回合级参数采样
 

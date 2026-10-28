@@ -281,23 +281,37 @@ class EnvironmentHandler:
         else:
             policy_class = HumanActorCriticPolicy
             print("Using HumanActorCriticPolicy")
+        ppo_kwargs = DictionableDataclass.to_dict(config.ppo_params)
+        mirror_coef = ppo_kwargs.pop("mirror_coef", 0.0)
+        if not np.isfinite(mirror_coef) or mirror_coef < 0:
+            raise ValueError("mirror_coef must be finite and nonnegative")
+        algorithm = stable_baselines3.PPO
+        mirror_params = {}
+        if mirror_coef > 0:
+            from rl_train.train.mirror_ppo import MirrorPPO
+
+            algorithm = MirrorPPO
+            obs_perm, act_perm, n_muscle = EnvironmentHandler._mirror_permutations(config)
+            mirror_params = dict(mirror_coef=mirror_coef, obs_perm=obs_perm, act_perm=act_perm, n_muscle_actuators=n_muscle)
         if trained_model_path is not None:
             print(f"Loading trained model from {trained_model_path}")
-            model = stable_baselines3.PPO.load(
+            model = algorithm.load(
                 trained_model_path,
                 env=env,
                 custom_objects={"policy_class": policy_class},
+                mirror_coef=mirror_coef,
             )
         elif config.env_params.prev_trained_policy_path:
             print(f"Loading previous trained policy from {config.env_params.prev_trained_policy_path}")
             # when should I reset the (value)network?
-            model = stable_baselines3.PPO.load(
+            model = algorithm.load(
                 config.env_params.prev_trained_policy_path,
                 env=env,
                 custom_objects={"policy_class": policy_class},
                 # policy_kwargs=DictionableDataclass.to_dict(config.policy_params),
                 verbose=2,
-                **DictionableDataclass.to_dict(config.ppo_params),
+                mirror_coef=mirror_coef,
+                **ppo_kwargs,
             )
             # print(f"Resetting network: {config.custom_policy_params.reset_shared_net_after_load=}, {config.custom_policy_params.reset_policy_net_after_load=}, {config.custom_policy_params.reset_value_net_after_load=}")
             model.policy.reset_network(
@@ -306,31 +320,16 @@ class EnvironmentHandler:
                 reset_value_net=config.policy_params.custom_policy_params.reset_value_net_after_load,
             )
         else:
-            ppo_kwargs = DictionableDataclass.to_dict(config.ppo_params)
-            mirror_coef = ppo_kwargs.pop("mirror_coef", 0.0)
-            if mirror_coef > 0:
-                from rl_train.train.mirror_ppo import MirrorPPO
-
-                obs_perm, act_perm, n_muscle = EnvironmentHandler._mirror_permutations(config)
-                model = MirrorPPO(
-                    policy=policy_class,
-                    env=env,
-                    policy_kwargs=DictionableDataclass.to_dict(config.policy_params),
-                    verbose=2,
-                    mirror_coef=mirror_coef,
-                    obs_perm=obs_perm,
-                    act_perm=act_perm,
-                    n_muscle_actuators=n_muscle,
-                    **ppo_kwargs,
-                )
-            else:
-                model = stable_baselines3.PPO(
-                    policy=policy_class,
-                    env=env,
-                    policy_kwargs=DictionableDataclass.to_dict(config.policy_params),
-                    verbose=2,
-                    **ppo_kwargs,
-                )
+            model = algorithm(
+                policy=policy_class,
+                env=env,
+                policy_kwargs=DictionableDataclass.to_dict(config.policy_params),
+                verbose=2,
+                **mirror_params,
+                **ppo_kwargs,
+            )
+        if mirror_coef > 0:
+            model.configure_mirror(**mirror_params)
         return model
 
     @staticmethod

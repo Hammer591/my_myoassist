@@ -16,6 +16,11 @@ class TrainCheckpointData(DictionableDataclass):
     policy_gradient_loss: float = 0.0
     std: float = 0.0
     value_loss: float = 0.0
+    mirror_loss: float | None = None
+    mirror_loss_weighted: float | None = None
+    mirror_loss_muscle: float | None = None
+    mirror_loss_device: float | None = None
+    mirror_device_grad_share: float | None = None
     num_timesteps: int = 0
     average_num_timestep: float = 0.0
     average_reward_per_episode: float = 0.0
