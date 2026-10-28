@@ -79,5 +79,11 @@ def test_curriculum_config_boundaries_and_unchanged_baseline():
     baseline = json.loads(CONFIG.with_name(CONFIG.name.replace("20M", "50M")).read_text())
     assert current["total_timesteps"] == 20_000_000
     assert current["ppo_params"] == baseline["ppo_params"]
-    assert current["env_params"]["reward_keys_and_weights"] == baseline["env_params"]["reward_keys_and_weights"]
+    current_rewards = current["env_params"]["reward_keys_and_weights"].copy()
+    baseline_rewards = baseline["env_params"]["reward_keys_and_weights"].copy()
+    assert current_rewards.pop("exo_activation_penalty") == 0.1
+    assert current_rewards.pop("exo_action_diff_penalty") == 0.05
+    assert baseline_rewards.pop("exo_activation_penalty") == 0
+    assert baseline_rewards.pop("exo_action_diff_penalty") == 0
+    assert current_rewards == baseline_rewards
     assert current["env_params"]["robustness"] == baseline["env_params"]["robustness"]

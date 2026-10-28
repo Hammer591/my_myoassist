@@ -30,7 +30,7 @@ def test_normalization_bounds_relative_weight_invariance_and_units(monkeypatch):
         r = env.get_reward_dict(env.obs_dict)
         assert r["qpos_imitation_rewards"] == pytest.approx(env.dt * np.exp(-0.25))
         assert r["qvel_imitation_rewards"] == pytest.approx(env.dt)
-        assert env.rwd_keys_wt["qpos_imitation_rewards"] == 4.0
+        assert env.rwd_keys_wt["qpos_imitation_rewards"] == 8.0
         assert env.rwd_keys_wt["qvel_imitation_rewards"] == 1.0
         for joint in env._reward_keys_and_weights.qpos_imitation_rewards:
             env._reward_keys_and_weights.qpos_imitation_rewards[joint] *= 7
@@ -65,7 +65,7 @@ def test_boundary_error_is_penalized_and_legacy_rewards_are_preserved(monkeypatc
             if not normalized:
                 assert env.rwd_keys_wt["qpos_imitation_rewards"] == pytest.approx(3.9)
             else:
-                assert np.exp(-((0.2 / scales["knee_angle_l"]) ** 2)) == pytest.approx(0.1690133154)
+                assert np.exp(-((0.2 / scales["knee_angle_l"]) ** 2)) == pytest.approx(0.5272924240)
         finally:
             env.close()
 
@@ -110,8 +110,12 @@ def test_real_ppo_logs_reconstruct_normalized_return(tmp_path):
             assert record["imitation_reward_mode"] == "normalized"
             components = record["average_reward_dict_per_episode"]
             weights = record["effective_reward_weights"]
-            assert weights["qpos_imitation_rewards"] == 4
+            assert weights["qpos_imitation_rewards"] == 8
             assert weights["qvel_imitation_rewards"] == 1
+            assert weights["exo_activation_penalty"] == 0.1
+            assert weights["exo_action_diff_penalty"] == 0.05
+            assert components["exo_activation_penalty"] < 0
+            assert components["exo_action_diff_penalty"] < 0
             assert sum(components[k] * w for k, w in weights.items()) == pytest.approx(record["average_reward_per_episode"])
             assert components["dense"] == pytest.approx(record["average_reward_per_episode"])
     finally:

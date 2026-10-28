@@ -104,8 +104,8 @@
             "muscle_activation_penalty_per_step": 0.0,
             "joint_constraint_force_penalty": 1.0,
             "foot_force_penalty": 0.5,
-            "exo_activation_penalty": 0.0,
-            "exo_action_diff_penalty": 0.0
+            "exo_activation_penalty": 0.1,
+            "exo_action_diff_penalty": 0.05
         },
         "custom_max_episode_steps": 1000,
         "reference_data_path": "rl_train/reference_data/short_reference_gait.npz",
@@ -242,17 +242,17 @@
         },
         "imitation_reward": {
             "mode": "normalized",
-            "qpos_weight": 4.0,
+            "qpos_weight": 8.0,
             "qvel_weight": 1.0,
             "qpos_error_scales": {
-                "pelvis_ty": 0.03,
-                "pelvis_tilt": 0.1,
-                "hip_flexion_l": 0.15,
-                "hip_flexion_r": 0.15,
-                "knee_angle_l": 0.15,
-                "knee_angle_r": 0.15,
-                "ankle_angle_l": 0.15,
-                "ankle_angle_r": 0.15
+                "pelvis_ty": 0.05,
+                "pelvis_tilt": 0.15,
+                "hip_flexion_l": 0.25,
+                "hip_flexion_r": 0.25,
+                "knee_angle_l": 0.25,
+                "knee_angle_r": 0.25,
+                "ankle_angle_l": 0.25,
+                "ankle_angle_r": 0.25
             },
             "qvel_error_scales": {
                 "pelvis_ty": 0.2,
