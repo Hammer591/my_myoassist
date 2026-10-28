@@ -1,5 +1,6 @@
 from rl_train.train.train_configs.config import TrainSessionConfigBase
 from dataclasses import dataclass, field
+import math
 
 
 @dataclass
@@ -12,6 +13,27 @@ class ImitationTrainSessionConfig(TrainSessionConfigBase):
 
     @dataclass
     class EnvParams(TrainSessionConfigBase.EnvParams):
+        @dataclass
+        class TrajectoryCurriculum:
+            enabled: bool = False
+            initial_threshold: float = 0.3
+            anneal_timesteps: int = 5_000_000
+
+            def threshold_at(self, elapsed_timesteps: int, final_threshold: float) -> float:
+                if not self.enabled:
+                    return final_threshold
+                if (
+                    not math.isfinite(self.initial_threshold)
+                    or not math.isfinite(final_threshold)
+                    or not 0 < final_threshold <= self.initial_threshold
+                    or self.anneal_timesteps <= 0
+                ):
+                    raise ValueError("Trajectory curriculum requires initial >= final > 0 and positive anneal_timesteps")
+                progress = min(1.0, max(0.0, elapsed_timesteps / self.anneal_timesteps))
+                return self.initial_threshold + progress * (final_threshold - self.initial_threshold)
+
+        trajectory_curriculum: TrajectoryCurriculum = field(default_factory=TrajectoryCurriculum)
+
         @dataclass
         class RewardWeights(TrainSessionConfigBase.EnvParams.RewardWeights):
             qpos_imitation_rewards: dict = field(default_factory=dict)

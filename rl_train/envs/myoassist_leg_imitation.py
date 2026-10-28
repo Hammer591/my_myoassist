@@ -19,6 +19,8 @@ class ImitationCustomLearningCallback(BaseCustomLearningCallback):
         log_handler: train_log_handler.TrainLogHandler,
         original_reward_weights: ImitationTrainSessionConfig.EnvParams.RewardWeights,
         auto_reward_adjust_params: ImitationTrainSessionConfig.AutoRewardAdjustParams,
+        trajectory_curriculum=None,
+        final_trajectory_threshold: float = 0.2,
         verbose=1,
     ):
         super().__init__(
@@ -26,6 +28,14 @@ class ImitationCustomLearningCallback(BaseCustomLearningCallback):
         )
         self._reward_weights = original_reward_weights
         self._auto_reward_adjust_params = auto_reward_adjust_params
+        self._trajectory_curriculum = trajectory_curriculum
+        self._final_trajectory_threshold = final_trajectory_threshold
+        self._training_trajectory_threshold = None
+
+    def _on_training_start(self):
+        # Loaded checkpoints retain their lifetime step counter. The curriculum uses
+        # only steps collected by this learn() call, including when fine-tuning.
+        self._curriculum_start_timestep = self.model.num_timesteps
 
     def _init_callback(self):
         super()._init_callback()
@@ -56,6 +66,11 @@ class ImitationCustomLearningCallback(BaseCustomLearningCallback):
 
     def _on_rollout_start(self) -> None:
         super()._on_rollout_start()
+        curriculum = self._trajectory_curriculum
+        if curriculum is not None and curriculum.enabled:
+            elapsed = self.model.num_timesteps - self._curriculum_start_timestep
+            self._training_trajectory_threshold = curriculum.threshold_at(elapsed, self._final_trajectory_threshold)
+            self.training_env.env_method("set_training_trajectory_threshold", self._training_trajectory_threshold)
 
     def _prepare_log_data(self, log_data_base) -> ImitationTrainCheckpointData:
         # Construct the complete record before the base callback publishes it and evaluates.
@@ -63,6 +78,7 @@ class ImitationCustomLearningCallback(BaseCustomLearningCallback):
             **log_data_base.__dict__,
             reward_weights=DictionableDataclass.to_dict(self._reward_weights),
             reward_accumulate=self.reward_accumulate.copy(),
+            training_trajectory_threshold=self._training_trajectory_threshold,
         )
 
 
@@ -92,6 +108,10 @@ class MyoAssistLegImitation(MyoAssistLegBase):
     ):
         self._flag_random_ref_index = env_params.flag_random_ref_index
         self._out_of_trajectory_threshold = env_params.out_of_trajectory_threshold
+        if not kwargs.get("is_evaluate_mode", False):
+            self._out_of_trajectory_threshold = env_params.trajectory_curriculum.threshold_at(
+                0, env_params.out_of_trajectory_threshold
+            )
         self.reference_data_keys = env_params.reference_data_keys
         self._loop_reference_data = loop_reference_data
         self._reward_keys_and_weights: ImitationTrainSessionConfig.EnvParams.RewardWeights = env_params.reward_keys_and_weights
@@ -102,6 +122,10 @@ class MyoAssistLegImitation(MyoAssistLegBase):
             env_params=env_params,
             **kwargs,
         )
+
+    def set_training_trajectory_threshold(self, threshold: float):
+        if not self.is_evaluate_mode:
+            self._out_of_trajectory_threshold = threshold
 
     def set_reward_weights(self, reward_keys_and_weights: TrainSessionConfigBase.EnvParams.RewardWeights):
         self._reward_keys_and_weights = reward_keys_and_weights

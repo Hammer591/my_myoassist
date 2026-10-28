@@ -256,6 +256,8 @@ class EnvironmentHandler:
                 log_handler=train_log_handler,
                 original_reward_weights=config.env_params.reward_keys_and_weights,
                 auto_reward_adjust_params=config.auto_reward_adjust_params,
+                trajectory_curriculum=config.env_params.trajectory_curriculum,
+                final_trajectory_threshold=config.env_params.out_of_trajectory_threshold,
             )
         else:
             custom_callback = learning_callback.BaseCustomLearningCallback(

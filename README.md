@@ -112,6 +112,8 @@ and the ready-to-run specs in [`docs/examples/`](docs/examples/).
   python rl_train/run_train.py --config_file_path rl_train/train/train_configs/<config>.json
   ```
   See the [RL guide](docs/reinforcement-learning/index.md).
+  For PhotoHipExo, use the [20M-step trajectory curriculum](docs/reinforcement-learning/08_robustness.md)
+  with fixed strict evaluation and 20-second relaxed replays.
 - **Controller optimization**:
   ```bash
   # run a predefined optimization config from ctrl_optim/optim/training_configs/

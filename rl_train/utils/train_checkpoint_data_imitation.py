@@ -6,3 +6,4 @@ from rl_train.utils.train_checkpoint_data import TrainCheckpointData
 class ImitationTrainCheckpointData(TrainCheckpointData):
     reward_accumulate: dict = None
     reward_weights: dict = None
+    training_trajectory_threshold: float | None = None

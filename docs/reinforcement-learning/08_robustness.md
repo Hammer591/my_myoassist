@@ -8,19 +8,42 @@ PhotoHipExo 的完整示例配置：
 `rl_train/train/train_configs/imitation_22_PhotoHipExo_L1_robustness_example_20Nm.json`。
 该配置沿用 65,536 步短程试训设置。数值仅用于验证接口，不是实测标定结果，也不表示训练收敛。
 
-5000 万步正式配置为
-`rl_train/train/train_configs/imitation_22_PhotoHipExo_L1_robustness_50M_20Nm.json`，
+当前推荐的 2000 万步课程配置为
+`rl_train/train/train_configs/imitation_22_PhotoHipExo_L1_robustness_20M_20Nm.json`，
 使用 32 个环境、每环境每次采样 512 步，沿用长程配置的 PPO 参数：
 
 ```bash
 MUJOCO_GL=egl MPLBACKEND=Agg MPLCONFIGDIR=/tmp/myoassist_mpl \
 MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 \
   .my_venv/bin/python -m rl_train.run_train \
-  --config_file_path rl_train/train/train_configs/imitation_22_PhotoHipExo_L1_robustness_50M_20Nm.json
+  --config_file_path rl_train/train/train_configs/imitation_22_PhotoHipExo_L1_robustness_20M_20Nm.json
 ```
 
 当前机器已在宿主环境验证 EGL 离屏渲染；训练使用 CPU，定期评估仍可生成 replay 视频。
-完整 rollout 会将实际总步数补齐至 50,003,968，步数为所有环境的合计。
+完整 rollout 会将从零开始的实际总步数补齐至 20,004,864，步数为所有环境的合计，
+不是 PPO 更新轮数。2000 万步是预算，不保证收敛；原 50M 配置保留用于复现实验。
+
+新配置只增加轨迹阈值课程，奖励、PPO、人体/传感器/电机扰动与 50M 配置相同。
+前 500 万新增环境步将训练阈值由 0.3 线性收紧至 0.2，剩余训练保持 0.2。
+阈值在每次 rollout 开始时同步到所有 worker，达到 500 万步后的首个 rollout 使用 0.2；
+日志字段 `training_trajectory_threshold` 记录该批次采样实际使用的值。
+旧配置默认关闭课程，行为保持不变。
+
+自动评估同时生成 relaxed 和 strict 单回合结果，各最多 600 步（20 秒）。
+严格评估始终使用 `out_of_trajectory_threshold=0.2`，不使用训练课程阈值；
+宽松评估仍放开轨迹限制。高度条件保持 0.7，评估默认关闭扰动。
+不能直接比较不同课程阈值下的训练回合长度来判断收敛，应比较固定严格标准下的结果。
+
+配置默认从零训练。要从已有检查点续训，在上述命令后追加：
+
+```bash
+--config.env_params.prev_trained_policy_path rl_train/results/train_session_20261027-215530/trained_models/model_50003968.zip
+```
+
+续训保留检查点累计计数，但预算为额外 2000 万步，课程从本次 `learn()` 的零新增步开始。
+不自动选择历史训练奖励最高的检查点；建议先以相同起始种子比较最终模型与 model_46399488。
+新增课程参数位于 `env_params.trajectory_curriculum`：
+`enabled=true`、`initial_threshold=0.3`、`anneal_timesteps=5000000`。
 
 长程配置的 checkpoint/日志间隔从 8 改为 16 个 rollout（262,144 步），
 评估间隔从默认的 64 翻倍至 128 个 rollout（2,097,152 步）。
