@@ -32,6 +32,7 @@ def test_normalization_bounds_relative_weight_invariance_and_units(monkeypatch):
         assert r["qvel_imitation_rewards"] == pytest.approx(env.dt)
         assert env.rwd_keys_wt["qpos_imitation_rewards"] == 8.0
         assert env.rwd_keys_wt["qvel_imitation_rewards"] == 1.0
+        assert env.rwd_keys_wt["foot_force_penalty"] == 2.0
         for joint in env._reward_keys_and_weights.qpos_imitation_rewards:
             env._reward_keys_and_weights.qpos_imitation_rewards[joint] *= 7
         scaled = env.get_reward_dict(env.obs_dict)

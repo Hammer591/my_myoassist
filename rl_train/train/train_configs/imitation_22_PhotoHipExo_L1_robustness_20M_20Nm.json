@@ -103,7 +103,7 @@
             "average_velocity_per_step": 0.0,
             "muscle_activation_penalty_per_step": 0.0,
             "joint_constraint_force_penalty": 1.0,
-            "foot_force_penalty": 0.5,
+            "foot_force_penalty": 2.0,
             "exo_activation_penalty": 0.1,
             "exo_action_diff_penalty": 0.05,
             "exo_torque_excess_penalty": 2.0
