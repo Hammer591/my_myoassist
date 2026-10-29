@@ -8,6 +8,7 @@ from rl_train.utils.learning_callback import BaseCustomLearningCallback
 from rl_train.utils.train_checkpoint_data_imitation import ImitationTrainCheckpointData
 from rl_train.train.train_configs.config_imitation import ImitationTrainSessionConfig
 from rl_train.utils.reward_weights import effective_reward_weights
+from rl_train.utils.reference_data import REFERENCE_MOTION_MODES
 ################################################################
 
 
@@ -23,6 +24,7 @@ class ImitationCustomLearningCallback(BaseCustomLearningCallback):
         trajectory_curriculum=None,
         final_trajectory_threshold: float = 0.2,
         imitation_reward=None,
+        reference_motion_mode="legacy_scaled",
         verbose=1,
     ):
         super().__init__(
@@ -34,6 +36,7 @@ class ImitationCustomLearningCallback(BaseCustomLearningCallback):
         self._final_trajectory_threshold = final_trajectory_threshold
         self._training_trajectory_threshold = None
         self._imitation_reward = imitation_reward
+        self._reference_motion_mode = reference_motion_mode
 
     def _on_training_start(self):
         # Loaded checkpoints retain their lifetime step counter. The curriculum uses
@@ -84,6 +87,7 @@ class ImitationCustomLearningCallback(BaseCustomLearningCallback):
             training_trajectory_threshold=self._training_trajectory_threshold,
             effective_reward_weights=effective_reward_weights(self._reward_weights, self._imitation_reward),
             imitation_reward_mode=self._imitation_reward.mode if self._imitation_reward is not None else "legacy",
+            reference_motion_mode=self._reference_motion_mode,
         )
 
 
@@ -118,6 +122,9 @@ class MyoAssistLegImitation(MyoAssistLegBase):
                 0, env_params.out_of_trajectory_threshold
             )
         self.reference_data_keys = env_params.reference_data_keys
+        self._reference_motion_mode = env_params.reference_motion_mode
+        if self._reference_motion_mode not in REFERENCE_MOTION_MODES:
+            raise ValueError(f"Invalid reference_motion_mode: {self._reference_motion_mode}")
         self._loop_reference_data = loop_reference_data
         self._reward_keys_and_weights: ImitationTrainSessionConfig.EnvParams.RewardWeights = env_params.reward_keys_and_weights
         self._imitation_reward = env_params.imitation_reward
@@ -157,13 +164,9 @@ class MyoAssistLegImitation(MyoAssistLegBase):
 
     def _get_qvel_diff(self):
         index = 0 if self._imitation_index is None else self._imitation_index
-        speed_ratio_to_target_velocity = self._target_velocity / self._reference_data["series_data"]["dq_pelvis_tx"][index]
 
         def get_qvel_diff_one(key: str):
-            diff = (
-                self.sim.data.joint(f"{key}").qvel[0].copy()
-                - self._reference_data["series_data"][f"dq_{key}"][index] * speed_ratio_to_target_velocity
-            )
+            diff = self.sim.data.joint(f"{key}").qvel[0].copy() - self._get_reference_qvel(key, index)
             return diff
 
         name_diff_dict = {}
@@ -171,6 +174,12 @@ class MyoAssistLegImitation(MyoAssistLegBase):
             # joint_weight = self._reward_keys_and_weights.qvel_imitation_rewards[q_key]
             name_diff_dict[q_key] = get_qvel_diff_one(q_key)
         return name_diff_dict
+
+    def _get_reference_qvel(self, key, index):
+        velocity = self._reference_data["series_data"][f"dq_{key}"][index]
+        if self._reference_motion_mode == "legacy_scaled":
+            velocity = velocity * (self._target_velocity / self._reference_data["series_data"]["dq_pelvis_tx"][index])
+        return velocity
 
     def _get_qpos_diff_nparray(self):
         return np.array([diff for diff in self._get_qpos_diff().values()])
@@ -277,13 +286,8 @@ class MyoAssistLegImitation(MyoAssistLegBase):
                 self.sim.data.joint(f"{key}").qpos = 0
             # if key == 'pelvis_ty':
             #     self.sim.data.joint(f"{key}").qpos += 0.05
-        speed_ratio_to_target_velocity = (
-            self._target_velocity / self._reference_data["series_data"]["dq_pelvis_tx"][self._imitation_index]
-        )
         for key in self.reference_data_keys:
-            self.sim.data.joint(f"{key}").qvel = (
-                self._reference_data["series_data"][f"dq_{key}"][self._imitation_index] * speed_ratio_to_target_velocity
-            )
+            self.sim.data.joint(f"{key}").qvel = self._get_reference_qvel(key, self._imitation_index)
 
     def imitation_step(self, is_x_follow: bool, specific_index: int | None = None):
         if specific_index is None:
@@ -386,7 +390,7 @@ class MyoAssistLegImitation(MyoAssistLegBase):
         return corrected
 
     def reset(self, seed=None, **kwargs):
-        # Pick the new target before scaling the reference velocities. The base reset
+        # Pick the new target before initializing reference velocities. The base reset
         # must not draw a second target after the pose/velocity copies have been made.
         self._prepare_reset_target(seed)
 
@@ -400,6 +404,10 @@ class MyoAssistLegImitation(MyoAssistLegBase):
         self.sim.data.qpos[:] = self.init_qpos.copy()
         self.sim.data.qvel[:] = self.init_qvel.copy()
         self._follow_reference_motion(False)
+        # Root forward speed is the task's initial condition, not a tracked qvel
+        # joint in shipped imitation rewards. Set it before copying reset_qvel;
+        # the base reset's in-place assignment is overwritten by that saved copy.
+        self.sim.data.joint("pelvis_tx").qvel[0] = self._target_velocity
 
         obs = super().reset(
             reset_qpos=self.sim.data.qpos.copy(),

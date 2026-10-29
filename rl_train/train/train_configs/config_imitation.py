@@ -76,6 +76,10 @@ class ImitationTrainSessionConfig(TrainSessionConfigBase):
         flag_random_ref_index: bool = False
         out_of_trajectory_threshold: float = 1
         reference_data_path: str = ""
+        # Historical configs keep their original grid and velocity scaling.
+        # fixed_rate uses exactly one control-period per reference frame, with
+        # unscaled reference velocities for both rewards and initialization.
+        reference_motion_mode: str = "legacy_scaled"
 
         reference_data_keys: list[str] = field(default_factory=list[str])
 

@@ -201,21 +201,13 @@ class EnvironmentHandler:
         else:
             raise ValueError("Unsupported file format. Please use either .npz or .json.")
 
-        if "resampled_series_data" not in ref_data_dict:
-            ref_data_dict["resampled_series_data"] = {}
-            for key in ref_data_dict["series_data"].keys():
-                original_data_length = len(ref_data_dict["series_data"][key])
-                original_sample_rate = ref_data_dict["metadata"]["sample_rate"]
-                original_x = np.linspace(0, original_data_length - 1, original_data_length)
+        from rl_train.utils.reference_data import resample_reference_data
 
-                new_sample_rate = config.env_params.control_framerate
-                new_length = int(original_data_length * new_sample_rate / original_sample_rate)
-                new_x = np.linspace(0, original_data_length - 1, new_length)
-                ref_data_dict["series_data"][key] = np.interp(new_x, original_x, ref_data_dict["series_data"][key])
-                ref_data_dict["metadata"]["resampled_data_length"] = new_length
-                ref_data_dict["metadata"]["resampled_sample_rate"] = new_sample_rate
-
-        return ref_data_dict
+        return resample_reference_data(
+            ref_data_dict,
+            config.env_params.control_framerate,
+            getattr(config.env_params, "reference_motion_mode", "legacy_scaled"),
+        )
 
     def get_config_type_from_session_id(session_id):
         # from rl_train.envs import myo_leg_18_reward_per_step
@@ -259,6 +251,7 @@ class EnvironmentHandler:
                 trajectory_curriculum=config.env_params.trajectory_curriculum,
                 final_trajectory_threshold=config.env_params.out_of_trajectory_threshold,
                 imitation_reward=config.env_params.imitation_reward,
+                reference_motion_mode=config.env_params.reference_motion_mode,
             )
         else:
             custom_callback = learning_callback.BaseCustomLearningCallback(

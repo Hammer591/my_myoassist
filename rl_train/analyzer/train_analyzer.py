@@ -77,7 +77,9 @@ class TrainAnalyzer:
             gait_data_name = f"gait_evaluated_data_{eval_idx:02d}.json"
 
             if not ImitationGaitEvaluator.is_single_episode_cache(
-                os.path.join(analyze_result_dir, gait_data_name), evaluation_mode
+                os.path.join(analyze_result_dir, gait_data_name),
+                evaluation_mode,
+                getattr(config.env_params, "reference_motion_mode", "legacy_scaled"),
             ):
                 is_regen_evaluating_data = True
             elif sys.stdin is not None and sys.stdin.isatty():

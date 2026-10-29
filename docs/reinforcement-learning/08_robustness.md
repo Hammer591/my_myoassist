@@ -45,21 +45,24 @@ MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 \
 新增课程参数位于 `env_params.trajectory_curriculum`：
 `enabled=true`、`initial_threshold=0.3`、`anneal_timesteps=5000000`。
 
-使用本地最新奖励及镜像续训修复，从本次提供的最新检查点追加3000万环境步：
+参考时序修复后的续训：从最新3000万步检查点追加1000万环境步，固定训练阈值0.2：
 
 ```bash
 MUJOCO_GL=egl MPLBACKEND=Agg MPLCONFIGDIR=/tmp/myoassist_mpl \
 MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 \
   .my_venv/bin/python -m rl_train.run_train \
   --config_file_path rl_train/train/train_configs/imitation_22_PhotoHipExo_L1_robustness_20M_20Nm.json \
-  --config.total_timesteps 30000000 \
+  --config.total_timesteps 10000000 \
+  --config.env_params.reference_motion_mode fixed_rate \
+  --no-config.env_params.trajectory_curriculum.enabled \
   --config.env_params.prev_trained_policy_path \
-  rl_train/results/train_session_20261028-204631/trained_models/model_33898496.zip
+  rl_train/results/train_session_20261028-231834/trained_models/model_30015488.zip
 ```
 
 该命令按当前配置每侧±20 N·m、qpos系数8、15 N·m超额惩罚和镜像系数0.1续训。
-3000万步是本次新增预算，累计计数约到6389.85万步并补齐完整rollout；
-课程仍从本次新增步数计算，前500万步由0.3收紧至0.2。不会修改原JSON中的2000万步默认值。
+1000万步是本次新增预算，完整rollout补齐后预计累计40,026,112步。
+该命令关闭本次阈值课程，直接固定0.2；原JSON仍保留从零训练用的2000万步预算与课程。
+命令行已经按具体环境配置类型注册参数，支持上述模仿学习专属覆盖项。
 
 长程配置的 checkpoint/日志间隔从 8 改为 16 个 rollout（262,144 步），
 评估间隔从默认的 64 翻倍至 128 个 rollout（2,097,152 步）。
@@ -105,8 +108,8 @@ contribution = overall_weight * component
 该设计仍是加权平均奖励，不能保证所有关节始终合格；严格终止条件继续独立检查任意关节越界。
 以上参数用于首轮对照，并非已验证的最优值；要按固定严格评估、速度误差、回合完成率及肌肉用力判断效果。
 
-本次仅改变奖励聚合与误差尺度。原有参考相位推进、qvel 的瞬时速度比缩放和策略观测接口保持现状，
-因此参考位置/速度一致性和相位信息缺失仍需独立诊断；不能将本次调整视为已解决全部轨迹偏离问题。
+奖励结构与参考时序修复分别配置；当前20M配置显式使用下述fixed_rate模式。
+策略观测接口保持44维，未添加参考相位观测；这仍是需要独立验证的问题。
 人体用力、速度跟踪、qvel 和各关节相对权重保持原值；外骨骼用力及动作变化采用以下小权重。
 
 ### 根据 train_session_20261028-175616 诊断调整的参数
@@ -199,6 +202,28 @@ train_log.json新增以下训练损失字段：
 
 首次PPO更新前或关闭镜像时，日志字段为null；历史日志缺失这些字段仍可读取。
 镜像误差为0时，设备占比记为0，避免除零产生NaN。该损失与力矩惩罚、qpos奖励分别记录。
+
+## 参考轨迹的固定帧率时间轴
+
+2026-10-29核对发现：旧实现每个控制步将位置参考前进一帧，却把速度奖励和reset参考速度
+乘以 `target_velocity / reference_dq_pelvis_tx[index]`，没有同步改变位置参考的推进速度。
+重采样还使用端点对齐linspace，导致帧间参考时间与配置控制周期略有不同。
+详见[参考时间轴审计](09_reference_timebase_20261029.md)。
+
+新配置设置 `env_params.reference_motion_mode="fixed_rate"`：
+
+- 重采样时间点为 `k/control_framerate`，不拉伸端点、不越过原数据终点。
+- 位置每控制步前进一帧；速度奖励、reset和参考回放统一使用该时间轴上的原始参考速度，
+  取消额外的瞬时目标速度比缩放。
+- reset的根部前进速度仍以本回合目标速度初始化；其余参考关节使用未额外缩放的速度。
+- 训练、自动评估和独立回放共用同一重采样实现；日志和评估metadata记录reference_motion_mode。
+  缓存模式必须匹配，无法解析的缓存重新生成。
+
+旧配置缺省为 `legacy_scaled`，保留原网格与速度缩放，便于复现历史结果。
+新旧模式保持同一策略网络、44维观测、24维动作，可加载旧检查点；这仍是目标和初始条件改变后的适应训练。
+该修复不保证提供的dq恰好等于数值差分，也没有加入相位观测或实现按目标速度整体重定时。
+对不同目标速度的步态适配，需要另行统一位置、速度和相位的重定时，不能只缩放dq。
+模仿奖励系数、力矩惩罚、PPO、物理模型及原始参考文件均未因本次修复更改。
 
 ## 回合级参数采样
 

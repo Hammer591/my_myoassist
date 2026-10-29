@@ -100,6 +100,7 @@ class GaitEvaluatorBase:
         seed = self.session_config.env_params.seed if seed is None else seed
         gait_data.metadata["evaluation"] = {
             "mode": self.evaluation_mode,
+            "reference_motion_mode": getattr(env_myoassist, "_reference_motion_mode", "legacy_scaled"),
             "checkpoint": os.path.abspath(trained_model_path + ".zip"),
             "seed": seed,
             "deterministic": True,
@@ -160,16 +161,22 @@ class GaitEvaluatorBase:
         return gait_data_path
 
     @staticmethod
-    def is_single_episode_cache(path: str, evaluation_mode: str) -> bool:
+    def is_single_episode_cache(path: str, evaluation_mode: str, reference_motion_mode="legacy_scaled") -> bool:
         """Reject old stitched rollouts when preparing a continuous policy replay."""
         if not os.path.exists(path):
             return False
-        with open(path, "r") as file:
-            metadata = json.load(file).get("metadata", {})
+        try:
+            with open(path, "r") as file:
+                metadata = json.load(file).get("metadata", {})
+        except (OSError, ValueError):
+            return False
         evaluation = metadata.get("evaluation", {})
         episodes = metadata.get("episodes", [])
         return (
-            evaluation.get("mode") == evaluation_mode and evaluation.get("terminate_when_done") is True and len(episodes) == 1
+            evaluation.get("mode") == evaluation_mode
+            and evaluation.get("reference_motion_mode", "legacy_scaled") == reference_motion_mode
+            and evaluation.get("terminate_when_done") is True
+            and len(episodes) == 1
         )
 
     def replay(
@@ -538,38 +545,15 @@ class ImitationGaitEvaluator(GaitEvaluatorBase):
             self.ref_data_dict = None
             return
 
-        if self.session_config.env_params.reference_data_path.endswith(".npz"):
-            ref_data_npz = np.load(self.session_config.env_params.reference_data_path, allow_pickle=True)
-            # keys = ref_data_npz.files
-            # ref_data_dict = {key: ref_data_npz[key] for key in keys}
-            ref_data_dict = {key: ref_data_npz[key].item() for key in ref_data_npz.files}
-        elif self.session_config.env_params.reference_data_path.endswith(".json"):
-            with open(self.session_config.env_params.reference_data_path, "r") as f:
-                ref_data_dict = json.load(f)
-        else:
+        if not self.session_config.env_params.reference_data_path.endswith((".npz", ".json")):
             print(
                 f"Warning: Unsupported file format for {self.session_config.env_params.reference_data_path}. Please use either .npz or .json."
             )
             self.ref_data_dict = None
             return
 
-        # Only process resampling if we have valid reference data
-        if ref_data_dict and "series_data" in ref_data_dict:
-            ref_data_dict["resampled_series_data"] = {}
-            for key in ref_data_dict["series_data"].keys():
-                original_data_length = len(ref_data_dict["series_data"][key])
-                original_sample_rate = ref_data_dict["metadata"]["sample_rate"]
-                original_x = np.linspace(0, original_data_length - 1, original_data_length)
-
-                new_sample_rate = self.session_config.env_params.control_framerate
-                new_length = int(original_data_length * new_sample_rate / original_sample_rate)
-                new_x = np.linspace(0, original_data_length - 1, new_length)
-                ref_data_dict["series_data"][key] = np.interp(new_x, original_x, ref_data_dict["series_data"][key])
-                # print(f"{key=} {original_data_length=} -> {new_length=} {len(ref_data_dict['series_data'][key])=}")
-                ref_data_dict["metadata"]["resampled_data_length"] = new_length
-                ref_data_dict["metadata"]["resampled_sample_rate"] = new_sample_rate
-
-        self.ref_data_dict = ref_data_dict
+        # Training, evaluation and reference plots must use the same time grid.
+        self.ref_data_dict = EnvironmentHandler.load_reference_data(self.session_config)
         print("===============REFERENCE DATA LOADING DONE================")
 
     def initialize_env(self, **kwargs):

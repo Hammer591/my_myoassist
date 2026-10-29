@@ -147,7 +147,9 @@ def main():
             or args.fixed_start
             or args.steps is not None
             or args.varying
-            or not ImitationGaitEvaluator.is_single_episode_cache(gait_data_path, args.evaluation_mode)
+            or not ImitationGaitEvaluator.is_single_episode_cache(
+                gait_data_path, args.evaluation_mode, config.env_params.reference_motion_mode
+            )
         )
 
         with _silence_stdout():

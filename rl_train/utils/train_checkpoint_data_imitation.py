@@ -9,3 +9,4 @@ class ImitationTrainCheckpointData(TrainCheckpointData):
     training_trajectory_threshold: float | None = None
     effective_reward_weights: dict = None
     imitation_reward_mode: str = "legacy"
+    reference_motion_mode: str = "legacy_scaled"

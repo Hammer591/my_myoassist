@@ -119,10 +119,11 @@ if __name__ == "__main__":
     default_config = EnvironmentHandler.get_session_config_from_path(
         args.config_file_path, myoassist_config.TrainSessionConfigBase
     )
+    config_type = EnvironmentHandler.get_config_type_from_session_id(default_config.env_params.env_id)
+    default_config = EnvironmentHandler.get_session_config_from_path(args.config_file_path, config_type)
     DictionableDataclass.add_arguments(default_config, parser, prefix="config.")
     args = parser.parse_args()
 
-    config_type = EnvironmentHandler.get_config_type_from_session_id(default_config.env_params.env_id)
     config = EnvironmentHandler.get_session_config_from_path(args.config_file_path, config_type)
 
     DictionableDataclass.set_from_args(config, args, prefix="config.")

@@ -267,7 +267,8 @@
             }
         },
         "exo_torque_soft_limit_nm": 15.0,
-        "exo_torque_excess_scale_nm": 5.0
+        "exo_torque_excess_scale_nm": 5.0,
+        "reference_motion_mode": "fixed_rate"
     },
     "ppo_params": {
         "learning_rate": 0.0001,
