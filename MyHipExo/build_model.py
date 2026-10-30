@@ -7,7 +7,7 @@ MESH=ROOT/'mesh'; MESH.mkdir(exist_ok=True)
 P=dict(hip_half_width=.165, motor_radius=.040, motor_thickness=.050,
        thigh_length=.290, battery_width=.205, battery_height=.110,
        battery_depth=.060, housing_top_y=.120, housing_center_x=-.173205,
-       total_mass=2.55, link_cuff_mass=.150,
+       total_mass=3.15, link_cuff_mass=.150, housing_added_mass=.600,
        link_twist_deg=90, link_thickness=.006, link_width_root=.028,
        link_width_tip=.047, side_beam_height=.028, side_beam_depth=.022,
        first_bend_spacing=.280, second_segment_length=.065,
@@ -393,6 +393,6 @@ for i,(el,az,title) in enumerate([(18,38,'Perspective'),(0,0,'Side'),(0,90,'Rear
             v,f=parts[n];q=(v+offset)[:,[2,0,1]]
             ax.add_collection3d(Poly3DCollection(q[f],facecolors='#343e48',edgecolors='none',alpha=1))
     ax.set(xlim=(-.24,.24),ylim=(-.24,.16),zlim=(-.44,.16),title=title);ax.set_box_aspect((.48,.4,.60));ax.view_init(el,az);ax.set_axis_off()
-fig.suptitle('PhotoHipExo V13 | Total mass 2.55 kg | Geometry-derived inertias',fontsize=15)
+fig.suptitle(f"PhotoHipExo V13 | Total mass {P['total_mass']:.2f} kg | Geometry-derived inertias",fontsize=15)
 plt.tight_layout();plt.savefig(ROOT/'preview.png',dpi=160)
 print(f'Generated {len(parts)} STL meshes and MJCF/YAML files in {ROOT}')

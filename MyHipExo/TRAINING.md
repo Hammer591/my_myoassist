@@ -41,7 +41,7 @@ MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 \
 .my_venv/bin/python -m rl_train.run_train --config_file_path rl_train/train/train_configs/device_sweep/imitation_22_PhotoHipExo_L1_h128_e32_sidenet_mirror0p1_actpen10.json
 ```
 
-该配置沿用 Hippo 的 22 肌肉人体、双侧外骨骼网络及镜像设置，只替换设备键。动作最后两维依次控制右、左电机。用户指定训练限值：每侧 `[-1, 1]` 输入对应 `[-20, 20]` N·m。2026-10-27 核对官方手册后，确认产品表列有“峰值输出 20 Nm”，但未说明单侧/双侧口径，也未给出连续额定扭矩、峰值持续时间或扭矩—转速曲线；当前理想执行器不代表连续输出能力已校准。详见 [官方指标核对](OFFICIAL_OUTPUT_SPEC.md)。质量以用户实测为准，保留现有约 2.55 kg 模型和惯量，不按官方含电池整机重量缩放。
+该配置沿用 Hippo 的 22 肌肉人体、双侧外骨骼网络及镜像设置，只替换设备键。动作最后两维依次控制右、左电机。用户指定训练限值：每侧 `[-1, 1]` 输入对应 `[-20, 20]` N·m。2026-10-27 核对官方手册后，确认产品表列有“峰值输出 20 Nm”，但未说明单侧/双侧口径，也未给出连续额定扭矩、峰值持续时间或扭矩—转速曲线；当前理想执行器不代表连续输出能力已校准。详见 [官方指标核对](OFFICIAL_OUTPUT_SPEC.md)。质量以用户实测为准；2026-10-30 按用户要求在后腰主舱增加 0.600 kg，当前整机 3.15 kg，不按官方含电池整机重量缩放。
 
 短程试训使用以下配置：65,536 步、单环境、每次采样 512 步、batch size 512、10 个优化 epoch。使用单环境是因为当前沙箱不允许多进程通信。其余网络、参考轨迹、奖励和终止阈值沿用原训练配置。
 
@@ -64,7 +64,7 @@ MPLCONFIGDIR=/tmp/myoassist_mpl MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 .
 .my_venv/bin/python -m unittest tools.tests.test_photo_hip_exo -v
 ```
 
-检查两个人体版本的加载、主舱中立姿态、髋轴同轴、不同髋角下固定器相对股骨不动、整机约 2.55 kg、驱动器顺序及 ±20 N·m 输出。另已运行实际训练环境的 128 步 MirrorPPO（44 维观测、24 维动作）；这只证明训练接入和梯度更新可运行，未验证步态收敛或真实助力效果。
+检查两个人体版本的加载、主舱中立姿态、髋轴同轴、不同髋角下固定器相对股骨不动、整机约 3.15 kg、驱动器顺序及 ±20 N·m 输出。另已运行实际训练环境的 128 步 MirrorPPO（44 维观测、24 维动作）；这只证明训练接入和梯度更新可运行，未验证步态收敛或真实助力效果。
 
 最新 ±20 N·m 试训已完成 65,536 步。相同 20 个起始种子的确定性复测中，平均回合长度由 1.20 提高到 2.25 个控制步，但仍未学会稳定行走。完整指标与检查点位置见 `validation/REPORT.md`。
 
@@ -80,3 +80,54 @@ MPLCONFIGDIR=/tmp/myoassist_mpl MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 .
 ```
 
 输出目录带 `_strict` / `_relaxed` 后缀，避免复用旧评估缓存。定期训练评估默认 relaxed；需要严格诊断时，在 `evaluate_param_list` 对应条目加入 `"evaluation_mode": "strict"`。旧的多回合拼接缓存会重新生成。两种模式均保存种子、有效阈值、每回合长度、结束原因及 episode ID，步态分段不会跨 reset。
+
+
+## 2026-10-30 裸人体基线与主舱增重
+
+裸人体资产来自已安装的 `myo_sim`，通过 `assist_sim.loading.load_msk` 加载；
+项目组合入口现在支持 `device_key: "NoDevice"`，仍使用相同地面和人体资产。
+现有 `imitation_tutorial_22_separated_net_exo_off.json` 仍加载 Tutorial 设备，
+且存在固定动作覆盖，不能当作完全不带设备的基线。
+
+裸人体配置已对齐最新 40M 训练任务：`fixed_rate` 参考时序、normalized 模仿奖励
+（qpos=8、qvel=1）、足力惩罚 2.0、关闭轨迹阈值课程，并包含 relaxed/strict 评估。
+配套的从头训练助力配置为 `imitation_22_PhotoHipExo_L1_fixed_rate_50M_20Nm.json`；
+原始 robustness_50M 配置保留历史设置，不作为这份裸人体配置的匹配对照。
+
+启动裸人体训练：
+
+```bash
+MUJOCO_GL=egl MPLBACKEND=Agg MPLCONFIGDIR=/tmp/myoassist_mpl \
+MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 \
+  .my_venv/bin/python -m rl_train.run_train \
+  --config_file_path rl_train/train/train_configs/imitation_22_NoDevice_robustness_50M.json
+```
+
+使用肌肉控制环境 `myoAssistLegImitation-v0`：44 维观测、22 维肌肉动作，
+人体 actor 为 `[128, 128]`，critic 为 `[64, 64]`，没有外骨骼网络。
+两组训练都从头开始，步数、速度 1.25 m/s、参考轨迹、人体奖励、终止阈值、
+人体随机化与 PPO/镜像参数一致。最新历史 40M 策略包含续训历史，不能宣称其与
+新训练的 50M 裸人体具有相同训练预算；严格对照应使用上述配套配置重新训练助力组。
+裸人体配置保留电机随机化字段以保持配置一致；
+无电机时这些字段不会施加任何力矩。
+
+比较时，应在相同速度、参考轨迹、评估种子与结束条件下，比较稳定行走阶段的
+全体及各肌肉平均激活、激活平方均值，并同时报告回合长度、速度与步态误差。
+激活降低率可写为 `(裸人体均值 - 助力均值) / 裸人体均值 × 100%`。
+不能把摔倒后的短片段或不同速度下的低激活解释为助力收益；肌肉激活降低也不等于
+已经验证真实代谢消耗降低。建议多个训练种子复测。
+
+质量变更由 `build_model.py` 中的 `total_mass=3.15`、`housing_added_mass=0.600`
+生成，额外质量按主舱 `battery` 网格包络均匀分布，重算腰架刚体的重心与完整惯量；
+其他部件质量分配保持原值。原始/训练/预览 MJCF 与物理属性报告已同步。
+该分布是假设，后续有新增部件的实测安装位置与尺寸时可进一步校准。
+已启动进程内的 MuJoCo 模型不会热更新；重启或恢复训练后重新加载才生效。
+此前 2.55 kg 的训练/验证报告保留为历史记录。已通过裸人体 128 步 MirrorPPO 更新、两个人体版本绑定及增重惯量回归检查（3 项测试）。未启动完整 5000 万步训练。
+
+本次沙箱使用 OSMesa 做无窗口验证，并在 Mesa 加载前导入 Torch 编译模块以避开原生库冲突：
+
+```bash
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 MUJOCO_GL=osmesa MPLBACKEND=Agg \
+MPLCONFIGDIR=/tmp/myoassist_mpl OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 \
+.my_venv/bin/python -c 'import torch._dynamo; import pytest; raise SystemExit(pytest.main(["tools/tests/test_no_device.py", "tools/tests/test_photo_hip_exo.py", "-q"]))'
+```

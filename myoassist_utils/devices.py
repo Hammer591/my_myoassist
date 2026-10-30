@@ -20,6 +20,8 @@ def available_combinations() -> dict[str, list[str]]:
     from assist_sim.config import DeviceConfig
 
     combos = registry.get_available_combinations()
+    for devices in combos.values():
+        devices.append("NoDevice")
     for key, path in local_device_configs().items():
         config = DeviceConfig.from_yaml(str(path))
         for msk, devices in combos.items():
@@ -30,6 +32,10 @@ def available_combinations() -> dict[str, list[str]]:
 
 def device_source_token(device_key: str) -> str:
     """Invalidate composed caches when local config, geometry or inertia changes."""
+    if device_key == "NoDevice":
+        from assist_sim.loading import _myosim_token
+
+        return f"bare@{_myosim_token()}@{Path(__file__).stat().st_mtime_ns}"
     path = local_device_configs().get(device_key)
     if path is None:
         return "bundled"
@@ -44,6 +50,12 @@ def device_source_token(device_key: str) -> str:
 
 
 def load_combined(msk_key: str, device_key: str, **kwargs):
+    if device_key == "NoDevice":
+        from assist_sim.loading import load_msk
+
+        if kwargs.pop("planar_root", False) and msk_key != "myolegs22":
+            raise ValueError("NoDevice planar_root currently requires myolegs22")
+        return load_msk(msk_key, **kwargs)
     path = local_device_configs().get(device_key)
     if path is None:
         return _load_combined(msk_key, device_key, **kwargs)

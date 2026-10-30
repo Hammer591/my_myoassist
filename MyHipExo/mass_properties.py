@@ -32,8 +32,10 @@ def calculate(parts,groups,p,hinge_pos):
         for name in names:
             measured=group.startswith('link_') and not name.startswith('hinge_')
             categories['link_and_cuff_'+group[-1] if measured else 'remaining_hardware'].append(name)
+    added_mass=p.get('housing_added_mass',0.)
+    if added_mass < 0:raise ValueError('housing_added_mass must be nonnegative')
     targets={'link_and_cuff_l':p['link_cuff_mass'],'link_and_cuff_r':p['link_cuff_mass'],
-             'remaining_hardware':p['total_mass']-2*p['link_cuff_mass']}
+             'remaining_hardware':(p['total_mass']-added_mass)-2*p['link_cuff_mass']}
     category_report={};per_part={};numeric={}
     for cat,names in categories.items():
         volume=sum(raw[n][0] for n in names);density=targets[cat]/volume
@@ -42,6 +44,17 @@ def calculate(parts,groups,p,hinge_pos):
             v,c,iv=raw[n];mass=v*density;inertia=iv*density
             numeric[n]=(mass,c,inertia)
             per_part[n]={'category':cat,'mass_kg':mass,'volume_m3':v,'center_mesh_frame_m':c.tolist(),'inertia_at_center_kg_m2':inertia.tolist()}
+    if added_mass:
+        # Distribute the added payload over the main housing envelope only.
+        # Preserve every original component's mass and inertia contribution.
+        v,c,iv=raw['battery'];extra_inertia=iv*(added_mass/v)
+        mass,_,inertia=numeric['battery']
+        numeric['battery']=(mass+added_mass,c,inertia+extra_inertia)
+        per_part['battery']['mass_kg']=mass+added_mass
+        per_part['battery']['added_housing_mass_kg']=added_mass
+        per_part['battery']['inertia_at_center_kg_m2']=(inertia+extra_inertia).tolist()
+        category_report['added_housing_payload']={'mass_kg':added_mass,'parts':['battery'],
+            'distribution':'Uniform over main housing envelope; original hardware mass distribution preserved.'}
     bodies={};assembled=[]
     for group,names in groups.items():
         mass,c,inertia=aggregate([numeric[n] for n in names])
