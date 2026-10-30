@@ -1,5 +1,5 @@
 {
-    "total_timesteps": 50000000,
+    "total_timesteps": 30000000,
     "evaluate_param_list": [
         {
             "num_timesteps": 600,
@@ -29,7 +29,7 @@
         "evaluate_frequency": 128
     },
     "env_params": {
-        "env_id": "myoAssistLegImitation-v0",
+        "env_id": "myoAssistLegImitationExo-v0",
         "num_envs": 32,
         "seed": 1234,
         "safe_height": 0.7,
@@ -72,11 +72,14 @@
             "l_toes"
         ],
         "msk_key": "myolegs22",
-        "device_key": "NoDevice",
+        "device_key": "PhotoHipExo_L1",
         "terrain": null,
         "reward_keys_and_weights": {
             "forward_reward": 1.0,
             "muscle_activation_penalty": 10.0,
+            "exo_activation_penalty": 0.1,
+            "exo_torque_excess_penalty": 2.0,
+            "exo_action_diff_penalty": 0.05,
             "muscle_activation_diff_penalty": 0.1,
             "footstep_delta_time": 0.0,
             "average_velocity_per_step": 0.0,
@@ -295,6 +298,14 @@
                 "common_critic": [
                     64,
                     64
+                ],
+                "exo_actor_r": [
+                    32,
+                    32
+                ],
+                "exo_actor_l": [
+                    32,
+                    32
                 ]
             },
             "net_indexing_info": {
@@ -425,6 +436,70 @@
                                 44
                             ],
                             "comment": "target velocity"
+                        }
+                    ]
+                },
+                "exo_actor_r": {
+                    "observation": [
+                        {
+                            "type": "index",
+                            "index": [
+                                3,
+                                2,
+                                11,
+                                10,
+                                39,
+                                40,
+                                41,
+                                42
+                            ],
+                            "comment": "hip_flexion angle, angular velocity and foot contact, right leg first then contralateral"
+                        }
+                    ],
+                    "action": [
+                        {
+                            "type": "range_mapping",
+                            "range_net": [
+                                0,
+                                1
+                            ],
+                            "range_action": [
+                                22,
+                                23
+                            ],
+                            "comment": "1 command for Exo_R"
+                        }
+                    ]
+                },
+                "exo_actor_l": {
+                    "observation": [
+                        {
+                            "type": "index",
+                            "index": [
+                                2,
+                                3,
+                                10,
+                                11,
+                                40,
+                                39,
+                                42,
+                                41
+                            ],
+                            "comment": "hip_flexion angle, angular velocity and foot contact, left leg first then contralateral"
+                        }
+                    ],
+                    "action": [
+                        {
+                            "type": "range_mapping",
+                            "range_net": [
+                                0,
+                                1
+                            ],
+                            "range_action": [
+                                23,
+                                24
+                            ],
+                            "comment": "1 command for Exo_L"
                         }
                     ]
                 }

@@ -91,7 +91,7 @@ MPLCONFIGDIR=/tmp/myoassist_mpl MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 .
 
 裸人体配置已对齐最新 40M 训练任务：`fixed_rate` 参考时序、normalized 模仿奖励
 （qpos=8、qvel=1）、足力惩罚 2.0、关闭轨迹阈值课程，并包含 relaxed/strict 评估。
-配套的从头训练助力配置为 `imitation_22_PhotoHipExo_L1_fixed_rate_50M_20Nm.json`；
+配套的从头训练助力配置为 `imitation_22_PhotoHipExo_L1_fixed_rate_30M_20Nm.json`；
 原始 robustness_50M 配置保留历史设置，不作为这份裸人体配置的匹配对照。
 
 启动裸人体训练：
@@ -100,14 +100,14 @@ MPLCONFIGDIR=/tmp/myoassist_mpl MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 .
 MUJOCO_GL=egl MPLBACKEND=Agg MPLCONFIGDIR=/tmp/myoassist_mpl \
 MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 \
   .my_venv/bin/python -m rl_train.run_train \
-  --config_file_path rl_train/train/train_configs/imitation_22_NoDevice_robustness_50M.json
+  --config_file_path rl_train/train/train_configs/imitation_22_NoDevice_robustness_30M.json
 ```
 
 使用肌肉控制环境 `myoAssistLegImitation-v0`：44 维观测、22 维肌肉动作，
 人体 actor 为 `[128, 128]`，critic 为 `[64, 64]`，没有外骨骼网络。
-两组训练都从头开始，步数、速度 1.25 m/s、参考轨迹、人体奖励、终止阈值、
+两组训练预算均为 3000 万步，从头开始；速度 1.25 m/s、参考轨迹、人体奖励、终止阈值、
 人体随机化与 PPO/镜像参数一致。最新历史 40M 策略包含续训历史，不能宣称其与
-新训练的 50M 裸人体具有相同训练预算；严格对照应使用上述配套配置重新训练助力组。
+新训练的 30M 裸人体具有相同训练预算；严格对照应使用上述配套配置重新训练助力组。
 裸人体配置保留电机随机化字段以保持配置一致；
 无电机时这些字段不会施加任何力矩。
 
@@ -122,7 +122,7 @@ MYOASSIST_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 \
 其他部件质量分配保持原值。原始/训练/预览 MJCF 与物理属性报告已同步。
 该分布是假设，后续有新增部件的实测安装位置与尺寸时可进一步校准。
 已启动进程内的 MuJoCo 模型不会热更新；重启或恢复训练后重新加载才生效。
-此前 2.55 kg 的训练/验证报告保留为历史记录。已通过裸人体 128 步 MirrorPPO 更新、两个人体版本绑定及增重惯量回归检查（3 项测试）。未启动完整 5000 万步训练。
+此前 2.55 kg 的训练/验证报告保留为历史记录。已通过裸人体 128 步 MirrorPPO 更新、两个人体版本绑定及增重惯量回归检查（3 项测试）。未启动完整 3000 万步训练。
 
 本次沙箱使用 OSMesa 做无窗口验证，并在 Mesa 加载前导入 Torch 编译模块以避开原生库冲突：
 

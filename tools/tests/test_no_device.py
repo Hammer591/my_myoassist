@@ -15,8 +15,8 @@ CONFIG_DIR = Path(__file__).resolve().parents[2] / 'rl_train/train/train_configs
 
 
 def test_bare_human_trains():
-    raw = json.loads((CONFIG_DIR / 'imitation_22_NoDevice_robustness_50M.json').read_text())
-    assisted = json.loads((CONFIG_DIR / 'imitation_22_PhotoHipExo_L1_fixed_rate_50M_20Nm.json').read_text())
+    raw = json.loads((CONFIG_DIR / 'imitation_22_NoDevice_robustness_30M.json').read_text())
+    assisted = json.loads((CONFIG_DIR / 'imitation_22_PhotoHipExo_L1_fixed_rate_30M_20Nm.json').read_text())
     for key in ('ppo_params', 'total_timesteps', 'evaluate_param_list'):
         assert raw[key] == assisted[key]
     for key, value in raw['env_params'].items():
@@ -24,6 +24,7 @@ def test_bare_human_trains():
             assert value == assisted['env_params'][key], key
     for key, value in raw['env_params']['reward_keys_and_weights'].items():
         assert value == assisted['env_params']['reward_keys_and_weights'][key]
+    assert raw['total_timesteps'] == 30_000_000
     assert raw['env_params']['reference_motion_mode'] == 'fixed_rate'
     assert raw['env_params']['imitation_reward']['mode'] == 'normalized'
     assert raw['env_params']['imitation_reward']['qpos_weight'] == 8.0
