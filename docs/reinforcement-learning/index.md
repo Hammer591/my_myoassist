@@ -25,6 +25,8 @@ The agent outputs actions that control:
 
 The [bare-human hip −35° training preset](11_no_device_hip35_20261102.md) documents the coordinate audit, revised limit costs, and command for a fresh 30-million-step run.
 
+For the second-stage assisted run, see [training the exoskeleton with a frozen human actor](12_frozen_human_exo_20261102.md).
+
 ## Training Workflow
 
 1. **Define a config**: start from an existing JSON preset, or create one from scratch.

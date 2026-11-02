@@ -89,6 +89,10 @@ class TrainSessionConfigBase:
         custom_max_episode_steps: int = 500
         model_path: str = None
         prev_trained_policy_path: str = None
+        # Initialize a new assisted policy from a human-only checkpoint. This is
+        # separate from prev_trained_policy_path, which resumes an entire PPO model.
+        human_actor_init_path: str = None
+        freeze_human_actor: bool = False
         reference_data_path: str = ""
 
         enable_lumbar_joint: bool = False

@@ -286,6 +286,16 @@ class EnvironmentHandler:
             algorithm = MirrorPPO
             obs_perm, act_perm, n_muscle = EnvironmentHandler._mirror_permutations(config)
             mirror_params = dict(mirror_coef=mirror_coef, obs_perm=obs_perm, act_perm=act_perm, n_muscle_actuators=n_muscle)
+        frozen_init = config.env_params.human_actor_init_path
+        freeze_human = config.env_params.freeze_human_actor
+        if frozen_init and not freeze_human:
+            raise ValueError("human_actor_init_path requires freeze_human_actor=True")
+        if frozen_init and config.env_params.prev_trained_policy_path:
+            raise ValueError("human_actor_init_path and prev_trained_policy_path are mutually exclusive")
+        if freeze_human and config.env_params.env_id not in _EXO_ENV_IDS:
+            raise ValueError("freeze_human_actor requires an assisted environment")
+        if freeze_human and trained_model_path is None and not frozen_init:
+            raise ValueError("Set --config.env_params.human_actor_init_path to a human-only checkpoint")
         if trained_model_path is not None:
             print(f"Loading trained model from {trained_model_path}")
             model = algorithm.load(
@@ -321,6 +331,13 @@ class EnvironmentHandler:
                 **mirror_params,
                 **ppo_kwargs,
             )
+        if freeze_human:
+            from rl_train.train.frozen_human import freeze_human_actor, initialize_frozen_human_actor
+
+            if trained_model_path is not None:
+                freeze_human_actor(model.policy)
+            elif frozen_init:
+                initialize_frozen_human_actor(model, frozen_init, config.env_params)
         if mirror_coef > 0:
             model.configure_mirror(**mirror_params)
         return model
