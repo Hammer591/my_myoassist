@@ -31,6 +31,9 @@ class TrainSessionConfigBase:
             # Penalise changes in the requested, normalised device action (not filtered output).
             exo_action_diff_penalty: float = 0.0
             muscle_activation_diff_penalty: float = 0.1
+            human_joint_torque_rate_penalty: float = 0.0
+            muscle_excitation_diff_penalty: float = 0.0
+            hip_antagonist_moment_penalty: float = 0.0
 
             # for reward per step
             footstep_delta_time: float = 0.0
@@ -53,6 +56,17 @@ class TrainSessionConfigBase:
         joint_limit_torque_scale_nm: float = 50.0
         joint_limit_proximity_joints: list[str] = field(default_factory=list)
         joint_limit_proximity_margin_rad: float = 0.08726646259971647
+
+        @dataclass
+        class HumanMomentRegularization:
+            torque_joints: list[str] = field(default_factory=list)
+            torque_rate_scale_nm_s: float = 600.0
+            excitation_diff_scale: float = 0.1
+            antagonist_joints: list[str] = field(default_factory=list)
+            antagonist_free_nm: float = 20.0
+            antagonist_scale_nm: float = 100.0
+
+        human_moment_regularization: HumanMomentRegularization = field(default_factory=HumanMomentRegularization)
 
         @dataclass
         class RobustnessParams:

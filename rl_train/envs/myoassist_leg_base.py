@@ -196,6 +196,51 @@ class MyoAssistLegBase(env_base.MujocoEnv):
                 raise ValueError("Joint proximity cost requires limited hinge joints")
         self._proximity_qpos_adrs = self.sim.model.jnt_qposadr[self._proximity_joint_ids].copy()
 
+        weights = env_params.reward_keys_and_weights
+        for key in ("human_joint_torque_rate_penalty", "muscle_excitation_diff_penalty", "hip_antagonist_moment_penalty"):
+            if not np.isfinite(getattr(weights, key)) or getattr(weights, key) < 0:
+                raise ValueError(f"{key} must be finite and nonnegative")
+        self._human_rate_enabled = weights.human_joint_torque_rate_penalty > 0
+        self._excitation_diff_enabled = weights.muscle_excitation_diff_penalty > 0
+        self._hip_antagonist_enabled = weights.hip_antagonist_moment_penalty > 0
+        reg = env_params.human_moment_regularization
+        self._human_torque_rate_scale = reg.torque_rate_scale_nm_s
+        self._excitation_diff_scale = reg.excitation_diff_scale
+        self._antagonist_free_nm = reg.antagonist_free_nm
+        self._antagonist_scale_nm = reg.antagonist_scale_nm
+        for enabled, value in (
+            (self._human_rate_enabled, self._human_torque_rate_scale),
+            (self._excitation_diff_enabled, self._excitation_diff_scale),
+            (self._hip_antagonist_enabled, self._antagonist_scale_nm),
+        ):
+            if enabled and (not np.isfinite(value) or value <= 0):
+                raise ValueError("Human moment regularization scales must be finite and positive")
+        if self._hip_antagonist_enabled and (not np.isfinite(self._antagonist_free_nm) or self._antagonist_free_nm < 0):
+            raise ValueError("antagonist_free_nm must be finite and nonnegative")
+        if (
+            self._human_rate_enabled or self._hip_antagonist_enabled or self._excitation_diff_enabled
+        ) and self._joint_limit_penalty_mode != "substep_squared_torque":
+            raise ValueError("Human moment regularization requires substep_squared_torque mode")
+
+        def hinge_dofs(names, enabled):
+            if not enabled:
+                return np.array([], dtype=int)
+            if not names or len(set(names)) != len(names):
+                raise ValueError("Human moment regularization requires distinct hinge joint names")
+            joints = [self.sim.model.joint(name).id for name in names]
+            if any(self.sim.model.jnt_type[j] != mujoco.mjtJoint.mjJNT_HINGE for j in joints):
+                raise ValueError("Human moment regularization requires hinge joints")
+            return self.sim.model.jnt_dofadr[joints].copy()
+
+        self._human_torque_dofs = hinge_dofs(reg.torque_joints, self._human_rate_enabled)
+        self._antagonist_dofs = hinge_dofs(reg.antagonist_joints, self._hip_antagonist_enabled)
+        self._muscle_actuator_ids = np.flatnonzero(self.sim.model.actuator_dyntype == mujoco.mjtDyn.mjDYN_MUSCLE)
+        self._prev_human_torque = None
+        self._prev_muscle_excitation = None
+        self._human_torque_rate_integral = 0.0
+        self._hip_antagonist_integral = 0.0
+        self._muscle_excitation_diff_cost = 0.0
+
         # Safely check whether the joint named "lumbar_extension" exists in the model.
         try:
             lumbar_joint_id = self.sim.model.joint("lumbar_extension").id  # Raises if joint is absent
@@ -430,6 +475,9 @@ class MyoAssistLegBase(env_base.MujocoEnv):
             "foot_force_penalty": foot_force_penalty,
             "joint_constraint_force_penalty": joint_constraint_force_penalty,
             "joint_limit_proximity_penalty": -self._joint_proximity_cost_integral,
+            "human_joint_torque_rate_penalty": -self._human_torque_rate_integral,
+            "muscle_excitation_diff_penalty": -self.dt * self._muscle_excitation_diff_cost,
+            "hip_antagonist_moment_penalty": -self._hip_antagonist_integral,
         }
         # Update base_reward with reward_per_steps
         base_reward.update(reward_per_steps)
@@ -478,6 +526,9 @@ class MyoAssistLegBase(env_base.MujocoEnv):
         self._joint_limit_cost_integral = 0.0
         self._foot_force_cost_integral = 0.0
         self._joint_proximity_cost_integral = 0.0
+        self._human_torque_rate_integral = 0.0
+        self._hip_antagonist_integral = 0.0
+        self._muscle_excitation_diff_cost = 0.0
         if motor_dynamics or substep_cost:
             # Retain MyoSuite's actuator mapping and limits, then model motor dynamics at
             # physics rate. Calling forward just once keeps rewards/step accounting correct.
@@ -490,6 +541,13 @@ class MyoAssistLegBase(env_base.MujocoEnv):
                 out_space="sim",
             )
             ids = self._device_actuator_ids
+            if self._excitation_diff_enabled:
+                excitation = ctrl[self._muscle_actuator_ids].copy()
+                if self._prev_muscle_excitation is not None:
+                    self._muscle_excitation_diff_cost = float(
+                        np.mean(((excitation - self._prev_muscle_excitation) / self._excitation_diff_scale) ** 2)
+                    )
+                self._prev_muscle_excitation = excitation
             desired = ctrl[ids].copy()
             physics_dt = float(self.sim.model.opt.timestep)
             weight = float(np.sum(self.sim.model.body_mass)) * 9.81
@@ -532,6 +590,37 @@ class MyoAssistLegBase(env_base.MujocoEnv):
             distance = np.minimum(q - ranges[:, 0], ranges[:, 1] - q)
             excess = np.maximum(0.0, 1.0 - distance / self._proximity_margin)
             self._joint_proximity_cost_integral += physics_dt * float(np.sum(excess**2))
+        if self._human_rate_enabled:
+            if len(self._device_actuator_ids):
+                torque = self._muscle_moment_contributions(self._human_torque_dofs).sum(axis=0)
+            else:
+                torque = self.sim.data.qfrc_actuator[self._human_torque_dofs].copy()
+            if self._prev_human_torque is not None:
+                rate = (torque - self._prev_human_torque) / (physics_dt * self._human_torque_rate_scale)
+                self._human_torque_rate_integral += physics_dt * float(np.mean(rate**2))
+            self._prev_human_torque = torque
+        if self._hip_antagonist_enabled:
+            parts = self._muscle_moment_contributions(self._antagonist_dofs)
+            opposing = np.minimum(np.maximum(parts, 0).sum(axis=0), -np.minimum(parts, 0).sum(axis=0))
+            excess = np.maximum(opposing - self._antagonist_free_nm, 0) / self._antagonist_scale_nm
+            self._hip_antagonist_integral += physics_dt * float(np.mean(excess**2))
+
+    def _muscle_moment_contributions(self, dofs):
+        """Per-muscle generalized moments, excluding all non-muscle actuators."""
+        data = self.sim.data.ptr
+        model = self.sim.model.ptr
+        if data.actuator_moment.ndim == 2:
+            moment = data.actuator_moment
+        else:
+            moment = np.zeros((model.nu, model.nv))
+            counts = data.moment_rownnz
+            # MuJoCo's compressed rows may have unused capacity between rows.
+            for i in self._muscle_actuator_ids:
+                start = data.moment_rowadr[i]
+                end = start + counts[i]
+                moment[i, data.moment_colind[start:end]] = data.actuator_moment[start:end]
+        ids = self._muscle_actuator_ids
+        return moment[ids][:, dofs] * data.actuator_force[ids, None]
 
     def just_forward(self):
         self.sim.forward()
@@ -621,6 +710,11 @@ class MyoAssistLegBase(env_base.MujocoEnv):
         self._joint_proximity_cost_integral = 0.0
         self._prev_device_action = None
         self._exo_action_diff_cost = 0.0
+        self._prev_human_torque = None
+        self._prev_muscle_excitation = None
+        self._human_torque_rate_integral = 0.0
+        self._hip_antagonist_integral = 0.0
+        self._muscle_excitation_diff_cost = 0.0
         self.sim.data.joint("pelvis_tx").qvel[0] = self._target_velocity
 
         self.sim.forward()
@@ -634,6 +728,7 @@ class MyoAssistLegBase(env_base.MujocoEnv):
         # generate resets
         # obs = super().reset(reset_qpos= self.sim.data.qpos, reset_qvel=self.sim.data.qvel, **kwargs)
         obs, info = super().reset(seed=seed, **kwargs)
+        self._prev_muscle_activations_for_reward = None
         self._prev_step_changed_time = self.sim.data.time
         if self._robustness is not None:
             obs = self._robustness.observe(obs)
