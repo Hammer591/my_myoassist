@@ -82,5 +82,11 @@ class ImitationTrainSessionConfig(TrainSessionConfigBase):
         reference_motion_mode: str = "legacy_scaled"
 
         reference_data_keys: list[str] = field(default_factory=list[str])
+        # Append qpos then qvel targets at each future control-step offset. Empty
+        # lists preserve the historical observation space and checkpoint layout.
+        reference_observation_keys: list[str] = field(default_factory=list)
+        reference_observation_steps: list[int] = field(default_factory=list)
+        validate_reference_joint_ranges: bool = False
+        reference_joint_range_tolerance_rad: float = 0.02
 
     env_params: EnvParams = field(default_factory=EnvParams)

@@ -38,12 +38,21 @@ class TrainSessionConfigBase:
             muscle_activation_penalty_per_step: float = 0.0
 
             joint_constraint_force_penalty: float = 0.0
+            joint_limit_proximity_penalty: float = 0.0
 
             foot_force_penalty: float = 0.0
 
         reward_keys_and_weights: RewardWeights = field(default_factory=RewardWeights)
         exo_torque_soft_limit_nm: float = 15.0
         exo_torque_excess_scale_nm: float = 5.0
+        # Radians for hinge joints. Applied to fresh runtime models, never package XML.
+        joint_range_overrides: dict = field(default_factory=dict)
+        # Legacy preserves checkpoint rewards. New mode integrates squared individual
+        # hinge limit torques and the existing foot-force excess at physics frequency.
+        joint_limit_penalty_mode: str = "legacy"
+        joint_limit_torque_scale_nm: float = 50.0
+        joint_limit_proximity_joints: list[str] = field(default_factory=list)
+        joint_limit_proximity_margin_rad: float = 0.08726646259971647
 
         @dataclass
         class RobustnessParams:
@@ -85,6 +94,9 @@ class TrainSessionConfigBase:
         enable_lumbar_joint: bool = False
         lumbar_joint_fixed_angle: float = 0.0
         lumbar_joint_damping_value: float = 0.05
+        # The historical no-lumbar-joint fallback treats angle as quaternion z,
+        # yielding 2*atan(angle). New configurations can request actual radians.
+        lumbar_fixed_angle_convention: str = "legacy_quaternion"
 
         # Geom groups to hide from rendering. Which group holds clutter and which holds hardware
         # is an authoring convention of whoever built the model, not something the environment can

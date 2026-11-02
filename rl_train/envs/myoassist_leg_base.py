@@ -84,6 +84,17 @@ class MyoAssistLegBase(env_base.MujocoEnv):
         # across the device sweep.
         import mujoco
 
+        for name, bounds in env_params.joint_range_overrides.items():
+            bounds = np.asarray(bounds, dtype=float)
+            joint = self.sim.model.joint(name)
+            if bounds.shape != (2,) or not np.isfinite(bounds).all() or bounds[0] >= bounds[1]:
+                raise ValueError(f"Invalid joint_range_overrides for {name}")
+            if self.sim.model.jnt_type[joint.id] != mujoco.mjtJoint.mjJNT_HINGE:
+                raise ValueError("joint_range_overrides currently supports hinge joints in radians only")
+            for sim in (self.sim,) if self.sim_obsd is self.sim else (self.sim, self.sim_obsd):
+                sim.model.joint(name).range[:] = bounds
+                sim.model.jnt_limited[sim.model.joint(name).id] = True
+
         device_ids = [i for i in range(self.sim.model.nu) if self.sim.model.actuator_dyntype[i] != mujoco.mjtDyn.mjDYN_MUSCLE]
         self._device_actuator_ids = np.asarray(device_ids, dtype=int)
         excess_weight = env_params.reward_keys_and_weights.exo_torque_excess_penalty
@@ -143,6 +154,47 @@ class MyoAssistLegBase(env_base.MujocoEnv):
         self.observation_joint_sensor_keys = env_params.observation_joint_sensor_keys
         # Joint-limit sensors: use the config list if provided, else the class default.
         self.joint_limit_sensor_keys = env_params.joint_limit_sensor_keys or self.JOINT_LIMIT_SENSOR_NAMES
+        self._joint_limit_penalty_mode = env_params.joint_limit_penalty_mode
+        if self._joint_limit_penalty_mode not in {"legacy", "substep_squared_torque"}:
+            raise ValueError("Unknown joint_limit_penalty_mode")
+        self._joint_limit_torque_scale = env_params.joint_limit_torque_scale_nm
+        self._joint_limit_cost_integral = 0.0
+        self._foot_force_cost_integral = 0.0
+        self._joint_proximity_cost_integral = 0.0
+        self._limit_sensor_adrs = []
+        if self._joint_limit_penalty_mode == "substep_squared_torque":
+            if not np.isfinite(self._joint_limit_torque_scale) or self._joint_limit_torque_scale <= 0:
+                raise ValueError("joint_limit_torque_scale_nm must be finite and positive")
+            for name in self.joint_limit_sensor_keys:
+                sensor_id = self.sim.model.sensor(name).id
+                model = self.sim.model
+                if model.sensor_type[sensor_id] != mujoco.mjtSensor.mjSENS_JOINTLIMITFRC:
+                    raise ValueError("Substep torque penalty requires joint-limit force sensors")
+                if model.jnt_type[model.sensor_objid[sensor_id]] != mujoco.mjtJoint.mjJNT_HINGE:
+                    raise ValueError("Substep torque penalty requires hinge joint sensors (N m)")
+                self._limit_sensor_adrs.append(int(model.sensor_adr[sensor_id]))
+            self._limit_sensor_adrs = np.asarray(self._limit_sensor_adrs, dtype=int)
+            self._foot_sensor_adrs = np.asarray(
+                [
+                    int(self.sim.model.sensor_adr[self.sim.model.sensor(name).id])
+                    for name in ("r_foot", "r_toes", "l_foot", "l_toes")
+                ]
+            )
+        self._proximity_margin = env_params.joint_limit_proximity_margin_rad
+        self._proximity_joint_ids = np.asarray(
+            [self.sim.model.joint(name).id for name in env_params.joint_limit_proximity_joints], dtype=int
+        )
+        if len(self._proximity_joint_ids):
+            if self._joint_limit_penalty_mode != "substep_squared_torque":
+                raise ValueError("Joint proximity cost requires substep_squared_torque mode")
+            if not np.isfinite(self._proximity_margin) or self._proximity_margin <= 0:
+                raise ValueError("Joint proximity margin must be finite and positive")
+            if any(
+                self.sim.model.jnt_type[i] != mujoco.mjtJoint.mjJNT_HINGE or not self.sim.model.jnt_limited[i]
+                for i in self._proximity_joint_ids
+            ):
+                raise ValueError("Joint proximity cost requires limited hinge joints")
+        self._proximity_qpos_adrs = self.sim.model.jnt_qposadr[self._proximity_joint_ids].copy()
 
         # Safely check whether the joint named "lumbar_extension" exists in the model.
         try:
@@ -169,7 +221,15 @@ class MyoAssistLegBase(env_base.MujocoEnv):
                 dof_adr = self.sim.model.jnt_dofadr[lumbar_joint_id]
                 self.sim.model.dof_damping[dof_adr] = self._lumbar_joint_damping_value
             else:
-                self.sim.model.body("torso").quat = [1, 0, 0, self._lumbar_joint_fixed_angle]
+                convention = env_params.lumbar_fixed_angle_convention
+                if convention == "legacy_quaternion":
+                    quat = [1, 0, 0, self._lumbar_joint_fixed_angle]
+                elif convention == "radians":
+                    half = self._lumbar_joint_fixed_angle / 2
+                    quat = [np.cos(half), 0, 0, np.sin(half)]
+                else:
+                    raise ValueError("Unknown lumbar_fixed_angle_convention")
+                self.sim.model.body("torso").quat = quat
 
         # phys: 1000hz
         # control 50hz : 50 * 20 = 1000hz
@@ -337,6 +397,8 @@ class MyoAssistLegBase(env_base.MujocoEnv):
         exo_torque_excess_penalty = -self.dt * self._get_device_torque_excess_cost()
 
         joint_constraint_force_penalty = -self.dt * self._get_max_joint_constraint_force() / (model_weight)
+        if self._joint_limit_penalty_mode == "substep_squared_torque":
+            joint_constraint_force_penalty = -self._joint_limit_cost_integral
 
         # TODO: take off muscle activation penalty from imitation rewards
         reward_per_steps, info = self._calculate_reward_per_step(obs_dict, muscle_activations)
@@ -354,6 +416,8 @@ class MyoAssistLegBase(env_base.MujocoEnv):
         # e^(-max(0, f/w - 1))
         # foot_force_penalty = self.dt * np.exp(-np.maximum(0, normalized_foot_force_sum - 1))
         foot_force_penalty = -self.dt * max(0, normalized_foot_force_sum - 1.2)
+        if self._joint_limit_penalty_mode == "substep_squared_torque":
+            foot_force_penalty = -self._foot_force_cost_integral
         # print(f"DEBUG:: foot_force_penalty: {foot_force_penalty}")
 
         base_reward = {
@@ -365,6 +429,7 @@ class MyoAssistLegBase(env_base.MujocoEnv):
             "muscle_activation_diff_penalty": muscle_activation_diff_penalty,
             "foot_force_penalty": foot_force_penalty,
             "joint_constraint_force_penalty": joint_constraint_force_penalty,
+            "joint_limit_proximity_penalty": -self._joint_proximity_cost_integral,
         }
         # Update base_reward with reward_per_steps
         base_reward.update(reward_per_steps)
@@ -406,7 +471,14 @@ class MyoAssistLegBase(env_base.MujocoEnv):
         )
         self._prev_device_action = device_action
         robustness = self._robustness
-        if robustness is not None and robustness.active and robustness.motor_active and len(self._device_actuator_ids):
+        motor_dynamics = (
+            robustness is not None and robustness.active and robustness.motor_active and len(self._device_actuator_ids)
+        )
+        substep_cost = self._joint_limit_penalty_mode == "substep_squared_torque"
+        self._joint_limit_cost_integral = 0.0
+        self._foot_force_cost_integral = 0.0
+        self._joint_proximity_cost_integral = 0.0
+        if motor_dynamics or substep_cost:
             # Retain MyoSuite's actuator mapping and limits, then model motor dynamics at
             # physics rate. Calling forward just once keeps rewards/step accounting correct.
             ctrl = self.robot.process_actuator(
@@ -420,10 +492,14 @@ class MyoAssistLegBase(env_base.MujocoEnv):
             ids = self._device_actuator_ids
             desired = ctrl[ids].copy()
             physics_dt = float(self.sim.model.opt.timestep)
+            weight = float(np.sum(self.sim.model.body_mass)) * 9.81
             for _ in range(self.frame_skip):
-                ctrl[ids] = robustness.motor_control(desired, physics_dt, self.sim.model.actuator_ctrlrange[ids])
+                if motor_dynamics:
+                    ctrl[ids] = robustness.motor_control(desired, physics_dt, self.sim.model.actuator_ctrlrange[ids])
                 self.sim.data.ctrl[:] = ctrl
                 self.sim.advance(substeps=1, render=False)
+                if substep_cost:
+                    self._accumulate_physics_costs(physics_dt, weight)
             self.last_ctrl = ctrl.copy()
             next_obs, reward, terminated, truncated, info = self.forward(**kwargs)
         else:
@@ -442,6 +518,20 @@ class MyoAssistLegBase(env_base.MujocoEnv):
         if is_over_time_limit:
             info["termination_reasons"].append("time_limit")
         return (next_obs, reward, terminated, truncated or is_over_time_limit, info)
+
+    def _accumulate_physics_costs(self, physics_dt, model_weight):
+        """Integrate individual hinge limits and touch-force excess, once per physics step."""
+        sensors = self.sim.data.sensordata
+        torque = sensors[self._limit_sensor_adrs] / self._joint_limit_torque_scale
+        self._joint_limit_cost_integral += physics_dt * float(np.sum(torque**2))
+        touch_sum = float(np.sum(np.abs(sensors[self._foot_sensor_adrs])))
+        self._foot_force_cost_integral += physics_dt * max(0.0, touch_sum / model_weight - 1.2)
+        if len(self._proximity_joint_ids):
+            ranges = self.sim.model.jnt_range[self._proximity_joint_ids]
+            q = self.sim.data.qpos[self._proximity_qpos_adrs]
+            distance = np.minimum(q - ranges[:, 0], ranges[:, 1] - q)
+            excess = np.maximum(0.0, 1.0 - distance / self._proximity_margin)
+            self._joint_proximity_cost_integral += physics_dt * float(np.sum(excess**2))
 
     def just_forward(self):
         self.sim.forward()
@@ -526,6 +616,9 @@ class MyoAssistLegBase(env_base.MujocoEnv):
         if not _target_prepared:
             self._prepare_reset_target(seed)
         self._step_count_per_episode = 0
+        self._joint_limit_cost_integral = 0.0
+        self._foot_force_cost_integral = 0.0
+        self._joint_proximity_cost_integral = 0.0
         self._prev_device_action = None
         self._exo_action_diff_cost = 0.0
         self.sim.data.joint("pelvis_tx").qvel[0] = self._target_velocity

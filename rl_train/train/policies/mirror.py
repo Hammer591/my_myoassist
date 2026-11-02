@@ -64,6 +64,9 @@ def observation_permutation(env_params, n_muscle_act: int, muscle_names: list[st
         list(env_params.observation_joint_sensor_keys),
         ["target_velocity"],
     ]
+    for _ in getattr(env_params, "reference_observation_steps", []):
+        keys = list(env_params.reference_observation_keys)
+        blocks.extend([keys, keys])  # qpos and qvel, separately at each horizon
     perm, offset = [], 0
     for names in blocks:
         perm.append(_permutation(names, "observation") + offset)

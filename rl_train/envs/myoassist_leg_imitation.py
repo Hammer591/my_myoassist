@@ -122,6 +122,18 @@ class MyoAssistLegImitation(MyoAssistLegBase):
                 0, env_params.out_of_trajectory_threshold
             )
         self.reference_data_keys = env_params.reference_data_keys
+        self._reference_observation_keys = list(env_params.reference_observation_keys)
+        self._reference_observation_steps = list(env_params.reference_observation_steps)
+        if bool(self._reference_observation_keys) != bool(self._reference_observation_steps):
+            raise ValueError("Reference observations require both joint keys and step offsets")
+        if len(set(self._reference_observation_keys)) != len(self._reference_observation_keys):
+            raise ValueError("Reference observation joint keys must be unique")
+        if any(not isinstance(s, int) or isinstance(s, bool) or s < 0 for s in self._reference_observation_steps):
+            raise ValueError("Reference observation step offsets must be nonnegative integers")
+        if "pelvis_tx" in self._reference_observation_keys:
+            raise ValueError("Reference observations must exclude absolute pelvis_tx, which resets to zero")
+        if self._reference_observation_keys:
+            self.DEFAULT_OBS_KEYS = [*self.DEFAULT_OBS_KEYS, "reference"]
         self._reference_motion_mode = env_params.reference_motion_mode
         if self._reference_motion_mode not in REFERENCE_MOTION_MODES:
             raise ValueError(f"Invalid reference_motion_mode: {self._reference_motion_mode}")
@@ -131,11 +143,28 @@ class MyoAssistLegImitation(MyoAssistLegBase):
         self._imitation_reward.validate(self._reward_keys_and_weights)
 
         self.setup_reference_data(data=reference_data)
+        for key in self._reference_observation_keys:
+            for prefix in ("q_", "dq_"):
+                if prefix + key not in self._reference_data["series_data"]:
+                    raise ValueError(f"Missing reference observation channel: {prefix}{key}")
 
         super()._setup(
             env_params=env_params,
             **kwargs,
         )
+        if env_params.validate_reference_joint_ranges:
+            tolerance = env_params.reference_joint_range_tolerance_rad
+            if not np.isfinite(tolerance) or tolerance < 0:
+                raise ValueError("Reference joint-range tolerance must be finite and nonnegative")
+            import mujoco
+
+            for key in self.reference_data_keys:
+                joint = self.sim.model.joint(key)
+                if joint.type[0] != mujoco.mjtJoint.mjJNT_HINGE or not joint.limited[0]:
+                    continue
+                values = np.asarray(self._reference_data["series_data"]["q_" + key])
+                if values.min() < joint.range[0] - tolerance or values.max() > joint.range[1] + tolerance:
+                    raise ValueError(f"Reference for {key} exceeds model joint range {joint.range.tolist()}")
 
     def set_training_trajectory_threshold(self, threshold: float):
         if not self.is_evaluate_mode:
@@ -146,7 +175,23 @@ class MyoAssistLegImitation(MyoAssistLegBase):
 
     # override from MujocoEnv
     def get_obs_dict(self, sim):
-        return super().get_obs_dict(sim)
+        obs = super().get_obs_dict(sim)
+        if self._reference_observation_keys:
+            current = 0 if self._imitation_index is None else self._imitation_index
+            values = []
+            for offset in self._reference_observation_steps:
+                index = current + offset
+                index = (
+                    index % self._reference_data_length
+                    if self._loop_reference_data
+                    else min(index, self._reference_data_length - 1)
+                )
+                values.extend(
+                    self._reference_data["series_data"]["q_" + key][index] for key in self._reference_observation_keys
+                )
+                values.extend(self._get_reference_qvel(key, index) for key in self._reference_observation_keys)
+            obs["reference"] = np.asarray(values, dtype=float)
+        return obs
 
     def _get_qpos_diff(self) -> dict:
         # MyoSuite requests rewards once during setup, before the first reset.

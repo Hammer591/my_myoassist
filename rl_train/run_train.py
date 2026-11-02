@@ -19,6 +19,10 @@ _MYOASSIST_THREADS = os.environ.get("MYOASSIST_NUM_THREADS", "8")
 for _thread_var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
     os.environ.setdefault(_thread_var, _MYOASSIST_THREADS)
 
+# Load Torch's optimizer dependencies before MuJoCo loads OSMesa. On systems where
+# Mesa and Triton bundle different LLVM builds, reversing this order can segfault.
+import torch._dynamo  # noqa: E402, F401
+
 import numpy as np  # noqa: E402  -- must follow the thread-pool caps above
 import rl_train.train.train_configs.config as myoassist_config  # noqa: E402
 import rl_train.utils.train_log_handler as train_log_handler  # noqa: E402

@@ -14,13 +14,16 @@ In our environments, the agent receives observations that include:
 - Joint velocities
 - Muscle activations
 - Sensory data (such as ground contact, force sensors, etc.)
-- Target velocity (the last observation component)
+- Target velocity
+- Optional future reference joint positions and velocities (appended after target velocity)
 
 **Action Space:**  
 The agent outputs actions that control:
 - Muscle activations (for the human actor network)
 - Exoskeleton control values (for the exoskeleton actor network)
 
+
+The [bare-human hip −35° training preset](11_no_device_hip35_20261102.md) documents the coordinate audit, revised limit costs, and command for a fresh 30-million-step run.
 
 ## Training Workflow
 
