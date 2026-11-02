@@ -126,7 +126,7 @@ class BaseCustomActorCriticPolicy(BasePolicy):
         value = self.policy_network.forward_critic(obs)
 
         # Create distribution and get actions
-        distribution = self.action_dist.proba_distribution(mean_actions, self.log_std)
+        distribution = self.action_dist.proba_distribution(mean_actions, self._distribution_log_std())
         actions = distribution.get_actions(deterministic=deterministic)
         log_prob = distribution.log_prob(actions)
 
@@ -142,7 +142,7 @@ class BaseCustomActorCriticPolicy(BasePolicy):
         # This is more efficient than calling forward_actor and forward_critic separately
 
         # Create distribution and evaluate actions
-        distribution = self.action_dist.proba_distribution(mean_actions, self.log_std)
+        distribution = self.action_dist.proba_distribution(mean_actions, self._distribution_log_std())
         log_prob = distribution.log_prob(actions)
         entropy = distribution.entropy()
 
@@ -157,7 +157,11 @@ class BaseCustomActorCriticPolicy(BasePolicy):
         :return: the action distribution.
         """
         mean_actions = self.policy_network.forward_actor(obs)
-        return self.action_dist.proba_distribution(mean_actions, self.log_std)
+        return self.action_dist.proba_distribution(mean_actions, self._distribution_log_std())
+
+    def _distribution_log_std(self) -> th.Tensor:
+        """Effective exploration scale; subclasses may share it across action pairs."""
+        return self.log_std
 
     def predict_values(self, obs: th.Tensor) -> th.Tensor:
         """

@@ -198,6 +198,11 @@ class TrainSessionConfigBase:
             log_std_init: float = field(default=-2.0)
 
             net_indexing_info: dict = field(default_factory=dict)
+            # Human-only actor: exact left/right equivariance, including exploration noise.
+            structural_symmetry: bool = False
+            # Derived from the composed model by EnvironmentHandler and saved in policy_kwargs.
+            symmetry_observation_permutation: list[int] = field(default_factory=list)
+            symmetry_action_permutation: list[int] = field(default_factory=list)
 
         custom_policy_params: CustomPolicyParams = field(default_factory=CustomPolicyParams)
 

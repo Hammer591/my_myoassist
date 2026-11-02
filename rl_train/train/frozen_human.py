@@ -83,6 +83,10 @@ def initialize_frozen_human_actor(model, checkpoint_path: str, target_env_params
     source, params, _ = load_from_zip_file(path, device=model.device)
     if source is None or source.get("policy_class") is not HumanActorCriticPolicy:
         raise ValueError("Human actor checkpoint must contain HumanActorCriticPolicy")
+    if source.get("policy_kwargs", {}).get("custom_policy_params", {}).get("structural_symmetry", False):
+        raise ValueError(
+            "Structural-symmetry human checkpoints require a matching assisted actor; raw MLP transfer would lose symmetry"
+        )
     if not isinstance(model.policy, HumanExoActorCriticPolicy):
         raise TypeError("Target model must use HumanExoActorCriticPolicy")
     n_human = source["action_space"].shape[0]

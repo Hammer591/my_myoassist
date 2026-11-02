@@ -275,6 +275,16 @@ class EnvironmentHandler:
             policy_class = HumanActorCriticPolicy
             print("Using HumanActorCriticPolicy")
         ppo_kwargs = DictionableDataclass.to_dict(config.ppo_params)
+        policy_kwargs = DictionableDataclass.to_dict(config.policy_params)
+        structural_symmetry = config.policy_params.custom_policy_params.structural_symmetry
+        if structural_symmetry and config.env_params.env_id in _EXO_ENV_IDS:
+            raise ValueError("structural_symmetry currently supports human-only policies")
+        if structural_symmetry:
+            symmetry_obs, symmetry_act, _ = EnvironmentHandler._mirror_permutations(config)
+            policy_kwargs["custom_policy_params"].update(
+                symmetry_observation_permutation=symmetry_obs.tolist(),
+                symmetry_action_permutation=symmetry_act.tolist(),
+            )
         mirror_coef = ppo_kwargs.pop("mirror_coef", 0.0)
         if not np.isfinite(mirror_coef) or mirror_coef < 0:
             raise ValueError("mirror_coef must be finite and nonnegative")
@@ -326,11 +336,23 @@ class EnvironmentHandler:
             model = algorithm(
                 policy=policy_class,
                 env=env,
-                policy_kwargs=DictionableDataclass.to_dict(config.policy_params),
+                policy_kwargs=policy_kwargs,
                 verbose=2,
                 **mirror_params,
                 **ppo_kwargs,
             )
+        if config.env_params.env_id not in _EXO_ENV_IDS:
+            loaded_symmetry = getattr(model.policy.policy_network, "structural_symmetry", False)
+            if loaded_symmetry != structural_symmetry:
+                raise ValueError(
+                    "Checkpoint structural_symmetry differs from config; start a new training run with matching architecture"
+                )
+            if structural_symmetry:
+                network = model.policy.policy_network
+                if not np.array_equal(network.symmetry_obs_perm.cpu().numpy(), symmetry_obs) or not np.array_equal(
+                    network.symmetry_act_perm.cpu().numpy(), symmetry_act
+                ):
+                    raise ValueError("Checkpoint symmetry permutations differ from the configured observation/action layout")
         if freeze_human:
             from rl_train.train.frozen_human import freeze_human_actor, initialize_frozen_human_actor
 

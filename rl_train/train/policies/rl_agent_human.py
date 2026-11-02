@@ -7,8 +7,31 @@ import rl_train.train.train_configs.config_imitation as myoassist_config_imitati
 
 
 class HumanPPOCustomNetwork(BasePPOCustomNetwork):
+    def __init__(self, observation_space, action_space, custom_policy_params):
+        super().__init__(observation_space, action_space, custom_policy_params)
+        self.structural_symmetry = custom_policy_params.structural_symmetry
+        if self.structural_symmetry:
+            for name, permutation, size in (
+                ("symmetry_obs_perm", custom_policy_params.symmetry_observation_permutation, observation_space.shape[0]),
+                ("symmetry_act_perm", custom_policy_params.symmetry_action_permutation, action_space.shape[0]),
+            ):
+                perm = th.as_tensor(permutation, dtype=th.long)
+                if perm.shape != (size,) or not th.equal(perm.sort().values, th.arange(size)):
+                    raise ValueError(f"{name} must be a full permutation of length {size}")
+                if not th.equal(perm[perm], th.arange(size)):
+                    raise ValueError(f"{name} must be an involution")
+                self.register_buffer(name, perm)
+            if th.equal(self.symmetry_act_perm, th.arange(action_space.shape[0])):
+                raise ValueError("Structural symmetry must exchange left/right actions")
+
     def forward_actor(self, obs: th.Tensor) -> th.Tensor:
-        return self.policy_net(obs)
+        if not self.structural_symmetry:
+            return self.policy_net(obs)
+        # Group average over identity and left/right reflection, with shared weights.
+        # Mirrored observations include all reference horizons, not only current pose.
+        action = self.policy_net(obs)
+        mirrored = self.policy_net(obs[:, self.symmetry_obs_perm])[:, self.symmetry_act_perm]
+        return 0.5 * (action + mirrored)
 
     def forward_critic(self, obs: th.Tensor) -> th.Tensor:
         return self.value_net(obs)
@@ -42,6 +65,14 @@ class HumanPPOCustomNetwork(BasePPOCustomNetwork):
 
 
 class HumanActorCriticPolicy(BaseCustomActorCriticPolicy):
+    def _distribution_log_std(self) -> th.Tensor:
+        network = self.policy_network
+        if network.structural_symmetry:
+            # Both raw pair parameters receive the same gradient. The effective noise
+            # is exactly shared even if their raw values were initialized differently.
+            return 0.5 * (self.log_std + self.log_std[network.symmetry_act_perm])
+        return self.log_std
+
     def _get_custom_policy_type(self):
         return myoassist_config_imitation.ImitationTrainSessionConfig.PolicyParams.CustomPolicyParams
 
