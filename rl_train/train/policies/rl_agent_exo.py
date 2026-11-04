@@ -26,11 +26,34 @@ class CustomNetworkHumanExo(BasePPOCustomNetwork):
         custom_policy_params: ExoImitationTrainSessionConfig.PolicyParams.CustomPolicyParams,
     ):
         super().__init__(observation_space, action_space, custom_policy_params)
+        self.frozen_human_structural_symmetry = False
+        if custom_policy_params.frozen_human_structural_symmetry:
+            self.set_human_symmetry(
+                custom_policy_params.human_symmetry_observation_permutation,
+                custom_policy_params.human_symmetry_action_permutation,
+            )
+
+    def set_human_symmetry(self, observation_permutation, action_permutation):
+        device = next(self.human_policy_net.parameters()).device
+        for name, values, size in (
+            ("human_symmetry_obs_perm", observation_permutation, self.network_index_handler.get_observation_num("human_actor")),
+            ("human_symmetry_act_perm", action_permutation, self.network_index_handler.get_action_num("human_actor")),
+        ):
+            perm = th.as_tensor(values, dtype=th.long, device=device)
+            expected = th.arange(size, device=device)
+            if perm.shape != (size,) or not th.equal(perm.sort().values, expected) or not th.equal(perm[perm], expected):
+                raise ValueError(f"{name} must be an involutive permutation of length {size}")
+            self.register_buffer(name, perm)
+        self.frozen_human_structural_symmetry = True
 
     def forward_actor(self, obs: th.Tensor) -> th.Tensor:
         network_output_dict = {
             name: net(self.network_index_handler.map_observation_to_network(obs, name)) for name, net in self.actor_nets.items()
         }
+        if self.frozen_human_structural_symmetry:
+            human_obs = self.network_index_handler.map_observation_to_network(obs, "human_actor")
+            mirrored = self.human_policy_net(human_obs[:, self.human_symmetry_obs_perm])[:, self.human_symmetry_act_perm]
+            network_output_dict["human_actor"] = 0.5 * (network_output_dict["human_actor"] + mirrored)
         return self.network_index_handler.map_network_to_action(network_output_dict)
 
     def forward_critic(self, obs: th.Tensor) -> th.Tensor:

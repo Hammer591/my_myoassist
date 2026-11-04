@@ -37,6 +37,9 @@ class ExoImitationTrainSessionConfig(ImitationTrainSessionConfig):
         # This actually does nothing
         @dataclass
         class CustomPolicyParams(ImitationTrainSessionConfig.PolicyParams.CustomPolicyParams):
+            frozen_human_structural_symmetry: bool = False
+            human_symmetry_observation_permutation: list[int] = field(default_factory=list)
+            human_symmetry_action_permutation: list[int] = field(default_factory=list)
             human_observation_indices: list[int] = field(default_factory=list[int])
             exo_observation_indices: list[int] = field(default_factory=list[int])
             human_action_size: int = 0

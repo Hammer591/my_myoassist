@@ -122,14 +122,14 @@ def test_old_architecture_requires_explicit_new_training(model_env, tmp_path):
         EnvironmentHandler.get_stable_baselines3_model(config, env, trained_model_path=symmetric_path)
 
 
-def test_frozen_transfer_cannot_silently_drop_projection(model_env, tmp_path):
+def test_frozen_transfer_requires_assisted_policy(model_env, tmp_path):
     from rl_train.train.frozen_human import initialize_frozen_human_actor
 
     config, _, model = model_env
     path = str(tmp_path / "symmetric.zip")
     model.save(path)
-    with pytest.raises(ValueError, match="raw MLP transfer would lose symmetry"):
-        initialize_frozen_human_actor(SimpleNamespace(device="cpu"), path, config.env_params)
+    with pytest.raises(TypeError, match="HumanExoActorCriticPolicy"):
+        initialize_frozen_human_actor(SimpleNamespace(device="cpu", policy=None), path, config.env_params)
 
 
 @pytest.mark.parametrize("bad", [[0], [0, 0], [1, 2, 0]])

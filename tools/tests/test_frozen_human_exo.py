@@ -26,23 +26,28 @@ def configured(path, cls):
     return config
 
 
-def checkpoint(tmp_path):
-    config = configured(HUMAN, ImitationTrainSessionConfig)
+def checkpoint(tmp_path, symmetric=False):
+    source = CONFIG_DIR / "imitation_22_NoDevice_hip35_knee3_smooth_symmetric_30M.json" if symmetric else HUMAN
+    config = configured(source, ImitationTrainSessionConfig)
     env = EnvironmentHandler.create_environment(config, is_rendering_on=False)
     path = tmp_path / "trained_models" / "human.zip"
     path.parent.mkdir()
     try:
         model = EnvironmentHandler.get_stable_baselines3_model(config, env)
+        with th.no_grad():
+            model.policy.log_std.copy_(th.linspace(-2, -0.5, 22))
         model.save(path)
-        (tmp_path / "session_config.json").write_text(HUMAN.read_text())
+        (tmp_path / "session_config.json").write_text(source.read_text())
         return path, model
     finally:
         env.close()
 
 
-def test_frozen_human_transfer_training_and_resume(tmp_path):
-    path, human = checkpoint(tmp_path)
-    config = configured(EXO, ExoImitationTrainSessionConfig)
+@pytest.mark.parametrize("symmetric", [False, True])
+def test_frozen_human_transfer_training_and_resume(tmp_path, symmetric):
+    path, human = checkpoint(tmp_path, symmetric)
+    target = CONFIG_DIR / "imitation_22_PhotoHipExo_L1_frozen_symmetric_human_30M.json" if symmetric else EXO
+    config = configured(target, ExoImitationTrainSessionConfig)
     config.env_params.human_actor_init_path = str(path)
     env = EnvironmentHandler.create_environment(config, is_rendering_on=False)
     try:
@@ -54,6 +59,10 @@ def test_frozen_human_transfer_training_and_resume(tmp_path):
         obs = th.as_tensor(env.reset()[0], dtype=th.float32).unsqueeze(0)
         with th.no_grad():
             th.testing.assert_close(actor(obs), human.policy.policy_network.policy_net(obs), rtol=0, atol=0)
+            samples = th.randn(31, 76)
+            expected = human.policy.policy_network.forward_actor(samples)
+            th.testing.assert_close(policy.policy_network.forward_actor(samples)[:, :22], expected, rtol=0, atol=0)
+            th.testing.assert_close(policy.log_std[:22], human.policy._distribution_log_std(), rtol=0, atol=0)
         assert all(not parameter.requires_grad for parameter in actor.parameters())
         before = {name: value.clone() for name, value in actor.state_dict().items()}
         human_noise = policy.log_std[:22].detach().clone()
@@ -68,9 +77,13 @@ def test_frozen_human_transfer_training_and_resume(tmp_path):
         assisted = tmp_path / "assisted.zip"
         model.save(assisted)
         restored = EnvironmentHandler.get_stable_baselines3_model(config, env, trained_model_path=str(assisted))
+        with th.no_grad():
+            th.testing.assert_close(restored.policy.policy_network.forward_actor(samples)[:, :22], expected, rtol=0, atol=0)
         assert all(not parameter.requires_grad for parameter in restored.policy.policy_network.human_policy_net.parameters())
         restored.learn(total_timesteps=64, progress_bar=False)
         th.testing.assert_close(restored.policy.log_std[:22], human_noise, rtol=0, atol=0)
+        with th.no_grad():
+            th.testing.assert_close(restored.policy.policy_network.forward_actor(samples)[:, :22], expected, rtol=0, atol=0)
         assert np.isfinite(restored.predict(env.reset()[0], deterministic=True)[0]).all()
     finally:
         env.close()

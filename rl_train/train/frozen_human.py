@@ -83,12 +83,11 @@ def initialize_frozen_human_actor(model, checkpoint_path: str, target_env_params
     source, params, _ = load_from_zip_file(path, device=model.device)
     if source is None or source.get("policy_class") is not HumanActorCriticPolicy:
         raise ValueError("Human actor checkpoint must contain HumanActorCriticPolicy")
-    if source.get("policy_kwargs", {}).get("custom_policy_params", {}).get("structural_symmetry", False):
-        raise ValueError(
-            "Structural-symmetry human checkpoints require a matching assisted actor; raw MLP transfer would lose symmetry"
-        )
+    symmetric = source.get("policy_kwargs", {}).get("custom_policy_params", {}).get("structural_symmetry", False)
     if not isinstance(model.policy, HumanExoActorCriticPolicy):
         raise TypeError("Target model must use HumanExoActorCriticPolicy")
+    if not symmetric and model.policy.policy_network.frozen_human_structural_symmetry:
+        raise ValueError("Plain human checkpoint cannot initialize a structurally symmetric assisted human actor")
     n_human = source["action_space"].shape[0]
     if n_human != 22 or source["observation_space"].shape != (76,) or model.observation_space.shape != (76,):
         raise ValueError("Human actor checkpoint must have 76 matching observations and 22 muscle actions")
@@ -102,6 +101,18 @@ def initialize_frozen_human_actor(model, checkpoint_path: str, target_env_params
     source_log_std = state["log_std"]
     if source_log_std.shape != (n_human,):
         raise ValueError("Human actor checkpoint has incompatible action noise")
+    if symmetric:
+        obs_perm = state["policy_network.symmetry_obs_perm"].tolist()
+        act_perm = state["policy_network.symmetry_act_perm"].tolist()
+        model.policy.policy_network.set_human_symmetry(obs_perm, act_perm)
+        # Save the architecture with the assisted checkpoint; loading must not
+        # depend on the original human checkpoint remaining on disk.
+        model.policy_kwargs["custom_policy_params"].update(
+            frozen_human_structural_symmetry=True,
+            human_symmetry_observation_permutation=obs_perm,
+            human_symmetry_action_permutation=act_perm,
+        )
+        source_log_std = 0.5 * (source_log_std + source_log_std[act_perm])
     with th.no_grad():
         model.policy.log_std[:n_human].copy_(source_log_std)
         model.policy.log_std[n_human:].fill_(-2.0)

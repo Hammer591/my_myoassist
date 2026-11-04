@@ -360,6 +360,14 @@ class EnvironmentHandler:
                 freeze_human_actor(model.policy)
             elif frozen_init:
                 initialize_frozen_human_actor(model, frozen_init, config.env_params)
+                # Record the transferred human architecture in session provenance.
+                for key in (
+                    "frozen_human_structural_symmetry",
+                    "human_symmetry_observation_permutation",
+                    "human_symmetry_action_permutation",
+                ):
+                    if key in model.policy_kwargs["custom_policy_params"]:
+                        setattr(config.policy_params.custom_policy_params, key, model.policy_kwargs["custom_policy_params"][key])
         if mirror_coef > 0:
             model.configure_mirror(**mirror_params)
         return model
