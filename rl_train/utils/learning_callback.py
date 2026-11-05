@@ -98,8 +98,16 @@ class BaseCustomLearningCallback(BaseCallback):
         records = self.train_log_handler.log_datas
         if records and records[-1].num_timesteps == self.model.num_timesteps:
             self.model.save(self.train_log_handler.get_path2save_model(self.model.num_timesteps))
+            records[-1].agent_metrics = self._agent_metrics()
+            self.train_log_handler.write_json_file()
         else:
             self._on_rollout_end(force_log=True, run_evaluation=False)
+
+    def _agent_metrics(self):
+        values = getattr(self.model, "latest_agent_metrics", {}).copy()
+        values.update({key: float(value) for key, value in self.logger.name_to_value.items()
+                       if key.startswith(("train/human_", "train/exo_", "rollout/human_", "rollout/exo_", "rollout/coadaptation_"))})
+        return values
 
     def _on_rollout_end(
         self, write_log: bool = True, *, force_log: bool = False, run_evaluation: bool = True
@@ -171,6 +179,7 @@ class BaseCustomLearningCallback(BaseCallback):
                     else {}
                 ),
                 termination_counts=self.termination_counts.copy(),
+                agent_metrics=self._agent_metrics(),
                 time=f"{datetime.now().strftime('%Y%m%d-%H%M%S.%f')}",
             )
             log_data = self._prepare_log_data(log_data)

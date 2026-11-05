@@ -29,4 +29,5 @@ class TrainCheckpointData(DictionableDataclass):
     reward_log_schema_version: int = 0  # Historical records have no verified component accounting.
     target_velocity_stats: dict = field(default_factory=dict)
     termination_counts: dict = field(default_factory=dict)
+    agent_metrics: dict = field(default_factory=dict)
     time: str = ""

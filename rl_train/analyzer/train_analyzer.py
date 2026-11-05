@@ -7,6 +7,7 @@ from rl_train.utils.data_types import DictionableDataclass
 from rl_train.analyzer.train_log_analyzer import TrainLogAnalyzer
 from rl_train.train.train_configs.config import TrainSessionConfigBase
 from rl_train.train.train_configs.config_imitation import ImitationTrainSessionConfig
+from rl_train.train.train_configs.config_imiatation_exo import ExoImitationTrainSessionConfig
 
 
 from rl_train.analyzer.gait_evaluate import ImitationGaitEvaluator
@@ -35,7 +36,9 @@ class TrainAnalyzer:
                 config = DictionableDataclass.create(TrainSessionConfigBase, config_dict)
             elif config.env_params.env_id in ["myoAssistLegImitation-v0", "myoAssistLegImitationExo-v0"]:
                 # print("Imitation train session config")
-                config = DictionableDataclass.create(ImitationTrainSessionConfig, config_dict)
+                config_type = (ExoImitationTrainSessionConfig if config.env_params.env_id == "myoAssistLegImitationExo-v0"
+                               else ImitationTrainSessionConfig)
+                config = DictionableDataclass.create(config_type, config_dict)
                 # print("\nAll fields in RewardWeights:")
                 # for field in fields(config.env_params.reward_keys_and_weights):
                 #     print(f"{field.name}: {getattr(config.env_params.reward_keys_and_weights, field.name)}")

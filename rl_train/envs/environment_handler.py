@@ -264,6 +264,13 @@ class EnvironmentHandler:
 
     @staticmethod
     def get_stable_baselines3_model(config: TrainSessionConfigBase, env, trained_model_path: str | None = None):
+        coadaptation = getattr(config.env_params, "coadaptation", None)
+        if coadaptation is not None and coadaptation.enabled:
+            if config.env_params.env_id not in _EXO_ENV_IDS:
+                raise ValueError("Co-adaptation requires an assisted environment")
+            from rl_train.train.coadaptive_init import build_coadaptive_model
+
+            return build_coadaptive_model(config, env, trained_model_path)
         import stable_baselines3
         from rl_train.train.policies.rl_agent_human import HumanActorCriticPolicy
         from rl_train.train.policies.rl_agent_exo import HumanExoActorCriticPolicy

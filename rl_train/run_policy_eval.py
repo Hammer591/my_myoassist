@@ -82,7 +82,7 @@ def main():
     from rl_train.utils.data_types import DictionableDataclass
     from rl_train.utils.train_log_handler import TrainLogHandler
     from rl_train.utils.train_checkpoint_data_imitation import ImitationTrainCheckpointData
-    from rl_train.train.train_configs.config_imitation import ImitationTrainSessionConfig
+    from rl_train.envs.environment_handler import EnvironmentHandler
     from rl_train.envs.myoassist_leg_base import MyoAssistLegBase
     from rl_train.analyzer.train_log_analyzer import TrainLogAnalyzer
     from rl_train.analyzer.gait_analyze import GaitAnalyzer
@@ -91,7 +91,8 @@ def main():
 
     with open(os.path.join(log_dir, "session_config.json"), "r") as f:
         config_dict = json.load(f)
-    config = DictionableDataclass.create(ImitationTrainSessionConfig, config_dict)
+    config_type = EnvironmentHandler.get_config_type_from_session_id(config_dict["env_params"]["env_id"])
+    config = DictionableDataclass.create(config_type, config_dict)
 
     if args.fixed_start:
         config.env_params.flag_random_ref_index = False

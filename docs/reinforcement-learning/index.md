@@ -27,6 +27,8 @@ The [bare-human hip −35° training preset](11_no_device_hip35_20261102.md) doc
 
 For the second-stage assisted run, see [training the exoskeleton with a frozen human actor](12_frozen_human_exo_20261102.md).
 
+For joint fine-tuning from an assisted checkpoint, see [co-adaptive human and hip-exoskeleton training](13_coadaptive_hip_exo_20261105.md).
+
 ## Training Workflow
 
 1. **Define a config**: start from an existing JSON preset, or create one from scratch.
